@@ -16,6 +16,7 @@ Type a label + Enter while it runs (e.g. "forward") to drop a marker in the outp
 import argparse
 import asyncio
 import json
+import os
 import sys
 import threading
 import time
@@ -41,6 +42,8 @@ async def main(a):
     last = {}
     distinct = defaultdict(set)
     t0 = time.time()
+    if a.log:
+        os.makedirs(os.path.dirname(os.path.abspath(a.log)), exist_ok=True)
     logf = open(a.log, "a") if a.log else None
 
     def mark(label):
