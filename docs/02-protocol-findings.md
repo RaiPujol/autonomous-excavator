@@ -63,3 +63,7 @@ Tool fix: macOS reports RSSI 127 for "unknown", which slipped past the `--rssi` 
 130 frames, checksum 130/130. Labels were sometimes typed just after the action instead of before, so mapping used the nearest action burst. Bucket down produced no captured frame (macOS samples only every ~0.3 s), 0x20 assumed.
 
 Next: confirm 0x20, and capture the iPhone's **raw** advert bytes with the ESP32 scanner so the ESP32 replay can copy the exact over-the-air layout.
+
+## Replay result (2026-10-31)
+
+`tools/mac_rccar_tx.py` (CoreBluetooth, service-UUID advert, new frame every 100 ms, ID copied from the iPhone) drove the excavator on the first try. No re-pairing needed. Protocol is solved for control purposes.

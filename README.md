@@ -19,9 +19,12 @@ captures/  raw logs + session notes (what was pressed when)
 
 ## Status
 
-- [ ] Identify app + BLE mode (GATT vs advertising broadcast)
-- [ ] First HCI snoop capture with scripted session
-- [ ] Frame format decoded (channels, neutral values, checksum)
-- [ ] APK decompiled, encoder confirmed
-- [ ] ESP32 replay: forward/stop
-- [ ] Full channel control from ESP32
+- [x] Identify app + BLE mode (GATT vs advertising broadcast)
+- [x] First capture (iPhone + Mac sniffer, no Android needed)
+- [x] Frame format decoded (channels, neutral values, checksum)
+- [ ] ~~APK decompiled~~ (not needed)
+- [x] **Mac drives the excavator** (`tools/mac_rccar_tx.py`, worked first try, 2026-10-31)
+- [ ] Confirm bucket down = 0x20
+- [ ] Python control API + keyboard teleop
+- [ ] Overhead camera + ArUco pose
+- [ ] Go-to-point, then scripted dig/dump
