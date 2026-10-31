@@ -61,7 +61,7 @@ async def main(a):
     threading.Thread(target=stdin_reader, daemon=True).start()
 
     def cb(dev, adv):
-        if adv.rssi < a.rssi:
+        if adv.rssi < a.rssi or adv.rssi == 127:  # 127 = macOS "unknown", not strong
             return
         if a.addr and dev.address.lower() != a.addr.lower():
             return

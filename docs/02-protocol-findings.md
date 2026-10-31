@@ -20,7 +20,7 @@ chk ctr  00  14   A   B    C   D   34 30 34 b7 06 7f 07 0c
 | b2 b3 | Constant `00 14` | Probably frame type or length |
 | b4 (A) | **Magnitude**, 0-9 seen | Ramped 04, 08, 09 and held 09 for ~3 s |
 | b5 (B) | Always 00 so far | |
-| b6 (C) | 04 for the first ~10 s, then 00 | Possibly a mode/speed/light flag |
+| b6 (C) | **Flags**. `0x04` = **lights on** (latched: sent in every frame while on) | Session 02: toggled lights only, C followed it exactly. Session 01 started with lights on |
 | b7 (D) | **Direction bitmask**: 01, 02, 08 seen | One bit per direction, so 04 is probably the fourth |
 | b8-b15 | Constant `34 30 34 b7 06 7f 07 0c` | Probably pairing/bind ID. Check whether it changes after re-pairing or on a different phone |
 
@@ -35,5 +35,11 @@ Idle frame: `A=00 B=00 C=00 D=00`.
 
 1. Which D bit is forward / back / left / right?
 2. Is A really speed (proportional joystick) or the gear?
-3. What are C and B: arm channels, lights, sound, speed?
+3. What is B, and what are the other C bits (sound, speed gear)?
 4. Does the ID (b8-b15) change per phone or per pairing?
+
+## Session 02 (lights only)
+
+Started off, toggled several times, ended off. C went `00 -> 04 -> 00 -> 04 -> 00 -> 04 -> 00`, nothing else changed. Checksum still matches every frame. **C bit 0x04 = lights, confirmed.**
+
+Tool fix: macOS reports RSSI 127 for "unknown", which slipped past the `--rssi` filter. Now excluded.
