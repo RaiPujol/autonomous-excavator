@@ -20,6 +20,27 @@ Cheap dual-control toys usually do one of two things over BLE:
 
 Mode B is common on HG/HuiNa-style 1:64 toys because one cheap receiver chip serves both the remote and the app. The capture method below works for both.
 
+## Findings so far
+
+- App: **RCCar**, `com.DeliMiniChe.carapp` (developer JIACHENG / Hainan Yunyu Technology). The listing advertises "stable 2.4G transmission" from the phone with no dongle, which strongly suggests **Mode B (advertising broadcast)**.
+- No Android phone available. Primary capture path is now **iPhone running the app + laptop sniffing adverts** with `tools/ble_sniff.py`.
+- iOS apps cannot put arbitrary manufacturer data in adverts, so on iPhone the command is probably encoded in the **advertised service UUID list** or local name. Watch the `uuids=` field.
+
+## Step 0b: iPhone + laptop capture (no Android, no ESP32 needed)
+
+```bash
+pip install bleak
+python3 tools/ble_sniff.py --rssi -45 --log captures/session-01.jsonl
+```
+
+1. Hold the iPhone right next to the laptop, app in the foreground (iOS stops custom advertising in the background).
+2. Run the sniffer first with the app closed for ~10 s, then open the app.
+3. Before each action type a label + Enter (`idle`, `forward`, `stop`, ...), then do the action for ~2 s.
+4. Ctrl+C. The device with the most distinct payloads is the phone. Re-run with `--addr <it>` for clean output.
+5. Check the toy actually reacts during capture, so we know the frames are the real ones.
+
+On macOS the address is a per-Mac UUID, not a MAC. That is fine for filtering.
+
 ## Step 0: Identify the app and the radio (15 min)
 
 1. Note the app name from the manual/QR code and its package name (Play Store URL `id=...`).

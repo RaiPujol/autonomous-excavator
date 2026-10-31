@@ -13,7 +13,7 @@ Turning a Trasped 1:64 RC excavator (HG4-301/413 family, "2.4G remote + app" dua
 
 ```
 docs/      write-ups per phase
-tools/     parse_btsnoop.py (HCI log parser), esp32_ble_scanner (discovery sketch)
+tools/     ble_sniff.py (laptop advert sniffer), parse_btsnoop.py (Android HCI log parser), esp32_ble_scanner
 captures/  raw logs + session notes (what was pressed when)
 ```
 
