@@ -1,5 +1,16 @@
 # Protocol findings
 
+**Summary.** The RCCar app never connects to the toy. It broadcasts each command as a 128-bit service UUID in its BLE advertisement; the toy's 2.4 GHz receiver listens to those broadcasts. Frame (UUID string order):
+
+```
+chk ctr 00 14 - A B - C D - 34 30 34 b7 06 7f 07 0c
+chk = ctr ^ A ^ B ^ C ^ D ^ 0x08
+A, B = track speeds 0-50 (forward/back only), C = flags (0x04 lights), D = action bits
+D: 01 fwd, 02 back, 04 left, 08 right, 10 boom up, 20 boom down, 40 cab left, 80 cab right
+```
+
+Below: how each piece was found, session by session.
+
 ## Session 01 (2026-10-31, iPhone + MacBook, `ble_sniff.py`)
 
 - The iPhone running RCCar (local name `FF04`) is the broadcaster: 55 distinct payloads vs 1-2 for every other device nearby. The excavator moved during the capture.
@@ -19,7 +30,7 @@ chk ctr  00  14   A   B    C   D   34 30 34 b7 06 7f 07 0c
 | b1 | **Rolling counter**, +1 per frame | 0e, 0f, 11, 12 ... 6d |
 | b2 b3 | Constant `00 14` | Probably frame type or length |
 | b4 (A) | **Drive speed**, 0-50 (0x32 = max) | Session 03: 50, 49, 41, 34 while driving. Only nonzero with forward/back |
-| b5 (B) | **Always `max(0, A - 16)`** | 10/10 nonzero frames in session 03 fit, and session 01 (A <= 9, B = 0) fits too. Possibly a second motor PWM or a dead-band value |
+| b5 (B) | **Second track speed.** The app always sent `max(0, A - 16)`, which made the toy curve; we send B = A (+ trim) | Session 03 pattern, then confirmed by driving straight with A = B |
 | b6 (C) | **Flags**. `0x04` = **lights on** (latched: sent in every frame while on) | Session 02: toggled lights only, C followed it exactly. Session 01 started with lights on |
 | b7 (D) | **Action bitmask**, see table below | Session 03 |
 | b8-b15 | Constant `34 30 34 b7 06 7f 07 0c` | Probably pairing/bind ID. Check whether it changes after re-pairing or on a different phone |
@@ -45,12 +56,13 @@ Idle frame: `A=00 B=00 C=00 D=00`.
 - macOS only reports an advert every ~0.3 s, so we see a subsample. Fine for decoding, not for measuring the app's real send rate.
 - The bytes are in UUID-string order. Over the air, 128-bit UUIDs are little-endian (reversed). This matters when replaying from the ESP32: pass the UUID string to the BLE library and let it handle ordering.
 
-### Open questions (session 02)
+### Open questions (status)
 
-1. Which D bit is forward / back / left / right?
-2. Is A really speed (proportional joystick) or the gear?
-3. What is B, and what are the other C bits (sound, speed gear)?
-4. Does the ID (b8-b15) change per phone or per pairing?
+1. ~~Which D bit is forward / back / left / right?~~ Answered in session 03.
+2. ~~Is A speed?~~ Yes. A and B are the two track speeds (see "Curve on forward").
+3. Other C bits (sound, speed gear): not captured yet.
+4. Does the ID (b8-b15) change per phone or per pairing? Unknown; the Mac reuses the iPhone's ID and the toy accepts it.
+5. Bucket down = 0x20: inferred, not captured.
 
 ## Session 02 (lights only)
 

@@ -32,6 +32,8 @@ DEFAULTS = {
     "max_drive_pulse_s": 0.7,
     "max_turn_pulse_s": 0.35,
     "settle_s": 0.35,             # wait after each pulse before looking
+    "min_drive_pulse_s": 0.1,     # raise both (e.g. 0.3) for "gentle mode": fewer, longer motor starts
+    "min_turn_pulse_s": 0.08,     #   (helps if the toy browns out / switches off on a weak battery)
     "heading_tol_deg": 18,
     "goal_tol_cm": 3.5,
     "bucket_offset_cm": 5.0,      # bucket is this far ahead of the blob centre

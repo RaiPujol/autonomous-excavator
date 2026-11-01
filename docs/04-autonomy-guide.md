@@ -88,6 +88,7 @@ Open http://localhost:8000, press RUN MISSION. Everything works the same as for 
 | Calibration "spin too small" / spins wildly | Turn speed is the unknown: adjust Calib turn pulse (shorter if it spins more than ~60° per pulse) |
 | Stops short or overshoots | Arrive tolerance, Bucket ahead of centre |
 | Zig-zags a lot | Raise Settle after move (camera lag) |
+| Excavator switches off mid-run | Charge it first (200 mAh, ~20 min). If it still happens: "gentle mode" = Settings → Min drive pulse 0.3, Min turn pulse 0.25 (fewer motor starts, smaller current spikes). Also try TURN: PULSE in the Manual card |
 
 Edits apply live. Press SAVE SETTINGS to keep them.
 
@@ -95,7 +96,7 @@ Edits apply live. Press SAVE SETTINGS to keep them.
 
 ```
 autonomy/config.py   settings + defaults
-autonomy/vision.py   work area, homography, robot blob, overlays
+autonomy/vision.py   work area, homography, robot blob, overlays, grid for the planner
 autonomy/brain.py    calibration, go-to, dig/dump, mission
 autonomy/sim.py      simulated camera + excavator
 autonomy/vlm.py      plain-language commands -> plan (Claude vision)

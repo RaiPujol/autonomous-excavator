@@ -1,5 +1,7 @@
 # Phase 1: Reverse engineering the control protocol
 
+> **Historical plan (2026-10-31).** Written before we knew the hardware at hand. What actually happened: no Android was available, so the iPhone ran the app and the Mac sniffed its advertisements (Step 0b). No APK decompiling was needed. Results are in [02-protocol-findings.md](02-protocol-findings.md).
+
 Target: Trasped 1:64 RC excavator (HG4-301 / HG4-413 family). Spec sheets list "2.4G remote + mobile app dual control", 4 channels, 3.7 V 200 mAh battery, ~20 min runtime.
 
 Hardware available: ESP32, Flipper Zero, phone, two GPU machines.

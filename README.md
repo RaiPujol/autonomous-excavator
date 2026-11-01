@@ -1,59 +1,100 @@
 # Autonomous Excavator
 
-Turning a Trasped 1:64 RC excavator (HG4-301/413 family, "2.4G remote + app" dual control) into an autonomous robot.
+Retrofitting autonomy onto an off-the-shelf toy excavator (Trasped 1:64, HG4-301/413 family) with no access to its electronics: reverse-engineered radio protocol, camera-only perception, self-calibration by active perception, and a supervised autonomy stack that digs at A and dumps at B.
 
-## Autonomy
+![Autonomy dashboard](docs/img/dashboard.png)
 
-```bash
-python3 dashboard/server.py --sim      # try it with the simulator
-python3 dashboard/server.py --cam 1    # real excavator + iPhone camera
+## What it does
+
+- **Controls the toy from a laptop.** The phone app's Bluetooth commands were reverse-engineered from over-the-air captures (no Android, no app decompiling). The Mac re-creates them and drives the excavator; it worked on the first try.
+- **Sees it with an iPhone on the table**, at any angle, on any plain surface (a blanket works). No markers, no tape.
+- **Calibrates itself.** At startup it drives forward, back and spins, watching itself, to learn heading, speed and turn rate.
+- **Drives where you click, or where you say.** Click a spot or place targets A/B; or type "dig near the far corner, then dump next to B" and a vision-language model turns it into a plan that the navigation executes.
+- **Runs a full mission**: go to A, dig, go to B, dump, repeat. With an e-stop, a deadman timeout and a bounded work area.
+
+## How it works
+
+```mermaid
+flowchart LR
+  CAM[iPhone camera<br/>Continuity Camera] --> PER[Perception<br/>work area + yellow robot blob]
+  PER --> BRAIN[Brain<br/>self-calibration, move-stop-look go-to,<br/>dig/dump missions]
+  USER[Dashboard<br/>clicks, targets, STOP] --> BRAIN
+  CMD[Plain-language command] --> VLM[VLM planner<br/>Claude vision, JSON plan] --> BRAIN
+  BRAIN --> PROTO[Protocol<br/>frame + checksum]
+  PROTO --> BLE[Mac CoreBluetooth<br/>service-UUID broadcast]
+  BLE -->|2.4 GHz| EXC[Excavator]
 ```
 
-iPhone on the table at an angle, robot on any plain surface (e.g. a blanket), no markers or tape. Click to place targets or to drive, or type commands in plain language (vision-language planner). The excavator calibrates itself by wiggling, then goes A → dig → B → dump. Guide: [docs/05-autonomy-guide.md](docs/05-autonomy-guide.md).
+| Layer | Approach |
+|---|---|
+| Protocol | Commands hide inside a 128-bit BLE service UUID the app advertises: `checksum, counter, 0x0014, speed A, speed B, flags, action bits, pairing ID`. Decoded from 3 labelled capture sessions; checksum verified on all 185 captured frames. [Details](docs/02-protocol-findings.md) |
+| Work area | AUTO: the uniform region under the robot, in the camera's own view, scaled by the robot's known length. Or click 4 corners of a known rectangle for a true top-down homography in cm |
+| Robot state | Largest yellow blob inside the work area: position and long axis. Heading ambiguity (front vs back) resolved by motion: active perception |
+| Control | Move, stop, look: short turn or drive pulses, then a fresh measurement. Robust to ~0.3 s camera + radio latency |
+| Planner | Claude sees the camera image with a coordinate grid drawn on it and returns steps (`goto`, `dig`, `dump`, `set_target`). It never touches the motors; points outside the work area are rejected |
+| Safety | STOP / Space halts instantly; 0.4 s deadman on manual control; every autonomous command has its own timeout |
 
-![Dashboard](docs/img/dashboard.png)
+## Results so far
 
-## Drive it manually
+| Test | Result |
+|---|---|
+| Replay of decoded frames from the Mac | Drove the excavator first try |
+| Simulated missions (random start pose, random robot dynamics), metric mode | 11/11 complete, arrival error 0.4-3.5 cm |
+| Simulated missions, camera-view mode (no rectangle, robot-size scale) | 6/6 complete |
+| Click-placed targets from the dashboard, simulator | Complete, 1.0 cm at A, 3.5 cm at B |
+| Real floor (blue blanket, iPhone camera) | Work area and robot detected. Full mission: in progress (see Known issues) |
+
+## Quick start
 
 ```bash
-python3 ui/server.py
+git clone https://github.com/RaiPujol/autonomous-excavator.git
+cd autonomous-excavator
+pip install pyobjc-framework-CoreBluetooth opencv-contrib-python anthropic
 ```
 
-Open http://localhost:8000. Full step-by-step guide: [docs/03-control-panel-guide.md](docs/03-control-panel-guide.md).
+| I want to | Run | Guide |
+|---|---|---|
+| Try everything without hardware | `python3 dashboard/server.py --sim` | [Autonomy guide](docs/04-autonomy-guide.md) |
+| Drive the excavator manually | `python3 ui/server.py` | [Control panel guide](docs/03-control-panel-guide.md) |
+| Run autonomy on the real toy | `python3 dashboard/server.py --cam 1` | [Autonomy guide](docs/04-autonomy-guide.md) |
 
-![Control panel](docs/img/ui-desktop.png)
+Then open http://localhost:8000. Close the RCCar app on the phone first.
 
-## Phases
+## Docs
 
-1. **Reverse engineer the app protocol** and control the excavator from an ESP32. Plan: [docs/01-reverse-engineering-plan.md](docs/01-reverse-engineering-plan.md)
-2. **Control API** on the ESP32 (serial / Wi-Fi): `drive`, `swing`, `boom`, `arm`, `bucket`, `lights`.
-3. **Autonomy stack**: iPhone overhead camera + ArUco markers, pose, go-to-point, dig/dump. Plan: [docs/04-autonomy-plan.md](docs/04-autonomy-plan.md)
+1. [Reverse-engineering plan](docs/01-reverse-engineering-plan.md): options considered, why the app and not the 2.4 GHz remote
+2. [Protocol findings](docs/02-protocol-findings.md): frame layout, checksum, command table, session logs
+3. [Control panel guide](docs/03-control-panel-guide.md): manual driving, keyboard / touch / gamepad, trim
+4. [Autonomy guide](docs/04-autonomy-guide.md): setup, dashboard, tuning, troubleshooting
 
 ## Repo layout
 
 ```
-docs/      write-ups per phase
-autonomy/  vision, brain (calibration, navigation, mission), simulator, config
-dashboard/ server.py + index.html (autonomy dashboard)
-excavator/ protocol.py (frame builder), mac_ble.py (CoreBluetooth broadcaster)
-ui/        server.py + index.html (control panel)
-tools/     ble_sniff.py (laptop advert sniffer), parse_btsnoop.py (Android HCI log parser), esp32_ble_scanner
-captures/  raw logs + session notes (what was pressed when)
+excavator/   protocol.py (frame builder), mac_ble.py (CoreBluetooth broadcaster)
+autonomy/    vision.py, brain.py (calibration, navigation, missions), vlm.py, sim.py, config.py
+dashboard/   autonomy dashboard (server + page)
+ui/          manual control panel (server + page)
+tools/       ble_sniff.py, decode_rccar.py (protocol capture), mac_rccar_tx.py, camera_check.py,
+             parse_btsnoop.py (Android path), esp32_ble_scanner, esp32_rccar_tx (ESP32 sketches)
+captures/    capture session notes
+docs/        write-ups, images, archive/ (superseded marker-based plan)
 ```
 
-## Status
+## Known issues
 
-- [x] Identify app + BLE mode (GATT vs advertising broadcast)
-- [x] First capture (iPhone + Mac sniffer, no Android needed)
-- [x] Frame format decoded (channels, neutral values, checksum)
-- [ ] ~~APK decompiled~~ (not needed)
-- [x] **Mac drives the excavator** (`tools/mac_rccar_tx.py`, worked first try, 2026-10-31)
-- [ ] Confirm bucket down = 0x20
-- [x] Python control API + web control panel (keyboard, touch, gamepad)
-- [x] Throttle floor 15, throttle applies to turns, trim
-- [x] Markerless perception: pink square homography, green targets, yellow blob
-- [x] Self-calibration by active perception, move-stop-look go-to, A→B mission (11/11 in sim)
-- [x] Autonomy dashboard (camera views, map click-to-drive, mission, tuning)
-- [x] Surface-agnostic work area (auto region / clicked corners / tape), click-placed targets
-- [x] Plain-language commands via vision-language planner
-- [ ] Run on the real floor
+- **Excavator switches off during autonomous runs.** Most likely a weak battery (3.7 V 200 mAh, ~20 min): autonomous mode starts the motors many times, and each start draws a current spike that can reset the toy's chip. Next test: full charge, then "gentle mode" (Settings: Min drive pulse 0.3 s, Min turn pulse 0.25 s) to see if fewer, longer pulses avoid it.
+- **Turn speed on spins**: the app always sends speed 0 on spins; the panel sends the throttle. THROTTLE vs PULSE mode not yet compared on the real toy.
+- **Bucket down = `0x20`** is inferred from the bit pattern, not captured.
+- **Height bias**: the robot is ~5 cm tall, so from an angled camera it appears slightly further away than it is. Large targets absorb it; a correction is planned if it stops short.
+
+## Roadmap
+
+- [x] Decode the app protocol and drive from the Mac
+- [x] Manual control panel (keyboard, touch, gamepad, trim)
+- [x] Markerless perception, self-calibration, go-to, A→B mission, simulator
+- [x] Surface-agnostic work area, click-placed targets, plain-language commands
+- [ ] Full mission on the real floor + demo video + metrics (cycle time, success rate over 10 runs)
+- [ ] ROS 2 nodes (camera, perception, planner, radio driver) with Foxglove visualisation
+- [ ] Safety layer on the ESP32 in firmware (deadman, rate limits, e-stop), Mac sends commands over serial
+- [ ] Simulator missions as regression tests in CI
+- [ ] Learned detector / keypoints trained on frames auto-labelled by the current pipeline

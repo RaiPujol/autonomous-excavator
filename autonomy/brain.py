@@ -131,7 +131,7 @@ class Brain:
                 continue
             if abs(err) > c["heading_tol_deg"]:
                 dur = min(abs(err) / m["turn_deg_s"], c["max_turn_pulse_s"])
-                dur = max(dur, 0.08)
+                dur = max(dur, c.get("min_turn_pulse_s", 0.08))
                 want_positive = err > 0
                 action = "left" if (m["left_sign"] > 0) == want_positive else "right"
                 self.hw.pulse([action], c["turn_speed"], dur)
@@ -141,7 +141,7 @@ class Brain:
                 self._set_pose(*o.center, nh)
             else:
                 dur = min(dist_f / m["fwd_cm_s"], c["max_drive_pulse_s"])
-                dur = max(dur, 0.1)
+                dur = max(dur, c.get("min_drive_pulse_s", 0.1))
                 self.hw.pulse(["forward"], c["drive_speed"], dur)
                 o = self.look()
                 dx, dy = o.center[0] - x, o.center[1] - y
