@@ -51,7 +51,7 @@ Open http://localhost:8000, press RUN MISSION. Everything works the same as for 
 
 ## Run it for real
 
-1. Close the RCCar app on the phone. Excavator on, inside the pink square, turret centred.
+1. Close the RCCar app on the phone. Excavator on, on the blanket, turret centred.
 2. Start (replace `1` with your camera number):
    ```bash
    python3 dashboard/server.py --cam 1
@@ -68,8 +68,10 @@ Open http://localhost:8000, press RUN MISSION. Everything works the same as for 
 |---|---|
 | Header | Status lights, the live Bluetooth frame, STOP |
 | Camera | CAMERA = live view with detections. TOP-DOWN = perspective-corrected map view. COLOURS = what the colour filters see (use when tuning) |
-| Mission card | RUN MISSION (+ repeat count), CALIBRATE, GO TO A/B, DIG, DUMP, DETECT SCENE, SWAP A/B |
-| Map | Top-down view in cm. Robot, heading, trail, targets. **Click to drive there** |
+| Mission card | RUN MISSION (+ repeat count), CALIBRATE, GO TO A/B, DIG, DUMP, SWAP A/B |
+| Work area card | AUTO / CLICK CORNERS / PINK TAPE, DETECT AGAIN, click mode: DRIVE TO / TARGET A / TARGET B |
+| Command | Plain-language request, the plan is shown below it |
+| Map | Work area, robot, heading, trail, targets. **Click to drive there** (or place A/B) |
 | Manual | Same controls as the control panel (WASD, arrows, L, throttle, trim). Disabled during a job |
 | Settings | Colour sliders (opening it switches to the COLOURS view), sizes, speeds, timings. SAVE SETTINGS writes `autonomy/config.json` |
 
@@ -93,7 +95,7 @@ Edits apply live. Press SAVE SETTINGS to keep them.
 
 ```
 autonomy/config.py   settings + defaults
-autonomy/vision.py   tape squares, homography, robot blob, overlays
+autonomy/vision.py   work area, homography, robot blob, overlays
 autonomy/brain.py    calibration, go-to, dig/dump, mission
 autonomy/sim.py      simulated camera + excavator
 autonomy/vlm.py      plain-language commands -> plan (Claude vision)
