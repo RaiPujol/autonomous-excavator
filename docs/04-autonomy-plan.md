@@ -1,3 +1,5 @@
+> **Superseded (2026-10-31):** markers dropped. Final design: phone at an angle on the table, pink tape square as calibration target, green squares as targets, self-calibration by driving. See [05-autonomy-guide.md](05-autonomy-guide.md).
+
 # Phase 2: Autonomy stack
 
 ## Camera: iPhone overhead, via Continuity Camera

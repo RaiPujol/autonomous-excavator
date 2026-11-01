@@ -2,7 +2,18 @@
 
 Turning a Trasped 1:64 RC excavator (HG4-301/413 family, "2.4G remote + app" dual control) into an autonomous robot.
 
-## Drive it
+## Autonomy
+
+```bash
+python3 dashboard/server.py --sim      # try it with the simulator
+python3 dashboard/server.py --cam 1    # real excavator + iPhone camera
+```
+
+iPhone on the table at an angle, pink tape square + two green squares on the floor, no markers. The excavator calibrates itself by wiggling, then goes A → dig → B → dump. Guide: [docs/05-autonomy-guide.md](docs/05-autonomy-guide.md).
+
+![Dashboard](docs/img/dashboard.png)
+
+## Drive it manually
 
 ```bash
 python3 ui/server.py
@@ -22,6 +33,8 @@ Open http://localhost:8000. Full step-by-step guide: [docs/03-control-panel-guid
 
 ```
 docs/      write-ups per phase
+autonomy/  vision, brain (calibration, navigation, mission), simulator, config
+dashboard/ server.py + index.html (autonomy dashboard)
 excavator/ protocol.py (frame builder), mac_ble.py (CoreBluetooth broadcaster)
 ui/        server.py + index.html (control panel)
 tools/     ble_sniff.py (laptop advert sniffer), parse_btsnoop.py (Android HCI log parser), esp32_ble_scanner
@@ -38,5 +51,7 @@ captures/  raw logs + session notes (what was pressed when)
 - [ ] Confirm bucket down = 0x20
 - [x] Python control API + web control panel (keyboard, touch, gamepad)
 - [x] Throttle floor 15, throttle applies to turns, trim
-- [ ] Overhead iPhone camera + ArUco pose (`tools/camera_check.py`, `docs/markers.pdf`)
-- [ ] Go-to-point, then scripted dig/dump
+- [x] Markerless perception: pink square homography, green targets, yellow blob
+- [x] Self-calibration by active perception, move-stop-look go-to, A→B mission (11/11 in sim)
+- [x] Autonomy dashboard (camera views, map click-to-drive, mission, tuning)
+- [ ] Run on the real floor

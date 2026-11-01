@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Excavator Autonomy</title>
+<style>
+  :root{--bg:#0b0d10;--panel:#13161b;--panel2:#181c22;--line:#252a32;--text:#ece9e2;--muted:#7f8691;
+    --yellow:#f6b90b;--ydim:#6b5410;--red:#ff4936;--green:#3ddc84;--pink:#ff4fb8;--cyan:#3cd7ff;
+    --mono:ui-monospace,"SF Mono",Menlo,monospace}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:var(--bg);color:var(--text);font:13px/1.4 -apple-system,BlinkMacSystemFont,"Inter",sans-serif}
+  body{display:grid;grid-template-rows:auto 1fr;background:radial-gradient(1400px 700px at 40% 40%,#151920 0%,var(--bg) 70%)}
+  header{display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.14em;font-size:13px;margin-right:8px}
+  .brand .mark{width:22px;height:22px;border-radius:5px;background:repeating-linear-gradient(-45deg,var(--yellow) 0 5px,#111 5px 10px)}
+  .pill{display:flex;align-items:center;gap:7px;padding:5px 11px;border:1px solid var(--line);border-radius:99px;
+    font:600 10.5px var(--mono);letter-spacing:.08em;color:var(--muted);white-space:nowrap}
+  .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--red);box-shadow:0 0 8px var(--red)}
+  .pill.ok{color:var(--text)} .pill.ok .dot{background:var(--green);box-shadow:0 0 8px var(--green)}
+  .pill.warn .dot{background:var(--yellow);box-shadow:0 0 8px var(--yellow)}
+  .spacer{flex:1}
+  .frame{font:11.5px var(--mono);color:var(--muted)} .frame b{color:var(--yellow);font-weight:600}
+  .estop{border:none;border-radius:12px;padding:10px 22px;cursor:pointer;font:800 12px var(--mono);letter-spacing:.2em;
+    color:#fff;background:var(--red);box-shadow:0 0 0 2px #111,0 0 0 4px var(--red),0 0 30px -6px var(--red)}
+  .estop:active{transform:scale(.97)}
+
+  main{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(360px,1fr);gap:16px;padding:16px;min-height:0;overflow:auto}
+  .col{display:flex;flex-direction:column;gap:16px;min-width:0}
+  .card{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:18px;padding:14px 16px}
+  .card h2{display:flex;align-items:center;gap:10px;font:600 10.5px var(--mono);letter-spacing:.16em;color:var(--muted);margin-bottom:12px}
+  .card h2 .r{margin-left:auto;display:flex;gap:6px}
+  .tabs button,.chip{font:600 10px var(--mono);letter-spacing:.1em;padding:5px 10px;border-radius:8px;cursor:pointer;
+    background:#1c2027;color:var(--muted);border:1px solid var(--line)}
+  .tabs button.on{background:var(--yellow);color:#111;border-color:var(--yellow)}
+  .cam{position:relative;border-radius:12px;overflow:hidden;background:#000;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center}
+  .cam img{width:100%;height:100%;object-fit:contain;display:block}
+  .cam .badge{position:absolute;left:10px;top:10px;font:600 10px var(--mono);letter-spacing:.1em;background:#000a;padding:4px 8px;border-radius:6px}
+
+  .log{font:11.5px/1.55 var(--mono);color:#b9bec6;height:180px;overflow:auto;background:#0d1013;border:1px solid var(--line);border-radius:10px;padding:8px 10px;white-space:pre-wrap}
+  .log .hl{color:var(--yellow)} .log .err{color:var(--red)} .log .ok{color:var(--green)}
+
+  .mapwrap{position:relative}
+  canvas#map{width:100%;aspect-ratio:1;display:block;border-radius:12px;background:#0d1013;border:1px solid var(--line);cursor:crosshair}
+  .maphint{position:absolute;right:10px;bottom:8px;font:10px var(--mono);color:var(--muted)}
+
+  .status{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:#0d1013;border:1px solid var(--line);margin-bottom:12px}
+  .status b{font:600 13px var(--mono);color:var(--yellow);text-transform:uppercase;letter-spacing:.06em}
+  .status .spin{width:10px;height:10px;border-radius:50%;background:var(--muted)}
+  .status.busy .spin{background:var(--yellow);box-shadow:0 0 10px var(--yellow);animation:pulse 1s infinite}
+  @keyframes pulse{50%{opacity:.3}}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+  .act{border:1px solid var(--line);border-radius:12px;background:#1c2027;color:var(--text);padding:11px 8px;cursor:pointer;
+    font:600 11px var(--mono);letter-spacing:.08em;display:flex;align-items:center;justify-content:center;gap:6px;transition:.1s}
+  .act:hover{border-color:#3a414c} .act:active{transform:translateY(1px)}
+  .act.primary{background:var(--yellow);color:#111;border-color:var(--yellow);font-size:12px;padding:14px}
+  .act:disabled{opacity:.4;cursor:not-allowed}
+  .row{display:flex;gap:8px;align-items:center;margin-top:8px}
+  .row input[type=number]{width:56px;background:#0d1013;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px;font:12px var(--mono)}
+  .tele{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+  .ro{background:#0d1013;border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+  .ro small{display:block;font:600 9px var(--mono);letter-spacing:.12em;color:var(--muted)}
+  .ro b{font:600 14px var(--mono)}
+
+  .manual{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center}
+  .pad{display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,44px);gap:5px}
+  .k{border:1px solid var(--line);border-radius:10px;background:#1c2027;color:var(--text);font:600 11px var(--mono);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:none;user-select:none}
+  .k.on{background:var(--yellow);color:#111;border-color:var(--yellow);box-shadow:0 0 18px -4px var(--yellow)}
+  .n{grid-area:1/2}.w{grid-area:2/1}.e{grid-area:2/3}.s{grid-area:3/2}.c{grid-area:2/2;font-size:9px;color:var(--muted);border:none;background:none}
+  .sl{display:grid;grid-template-columns:70px 1fr 34px;gap:8px;align-items:center;font:600 10px var(--mono);color:var(--muted);letter-spacing:.08em;margin:5px 0}
+  .sl b{color:var(--yellow);text-align:right;font-size:12px}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:99px;background:#232830;outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#fff;border:3px solid var(--yellow);cursor:grab}
+  input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:#fff;border:3px solid var(--yellow)}
+  .toggles{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+  .chip.on{background:var(--yellow);color:#111;border-color:var(--yellow)}
+
+  details summary{cursor:pointer;list-style:none;font:600 10.5px var(--mono);letter-spacing:.16em;color:var(--muted)}
+  details summary::-webkit-details-marker{display:none}
+  details[open] summary{margin-bottom:10px}
+  .hsv{margin-bottom:10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px}
+  .hsv h3{font:600 10px var(--mono);letter-spacing:.12em;margin-bottom:4px}
+  .num{display:grid;grid-template-columns:1fr 70px;gap:6px 10px;align-items:center;font:600 10px var(--mono);color:var(--muted);letter-spacing:.06em}
+  .num input{background:#0d1013;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:6px 8px;font:12px var(--mono);width:100%}
+  @media (max-width:1100px){main{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="mark"></div>EXCAVATOR AUTONOMY</div>
+  <div class="pill" id="pMode"><span class="dot"></span><span>—</span></div>
+  <div class="pill" id="pCam"><span class="dot"></span><span>CAMERA</span></div>
+  <div class="pill" id="pScene"><span class="dot"></span><span>SCENE</span></div>
+  <div class="pill" id="pRobot"><span class="dot"></span><span>ROBOT</span></div>
+  <div class="pill" id="pCal"><span class="dot"></span><span>CALIBRATION</span></div>
+  <div class="spacer"></div>
+  <div class="frame" id="frame"></div>
+  <button class="estop" id="stop">STOP</button>
+</header>
+
+<main>
+  <div class="col">
+    <section class="card">
+      <h2>CAMERA <span class="r tabs" id="views">
+        <button data-v="camera" class="on">CAMERA</button><button data-v="topdown">TOP-DOWN</button><button data-v="mask">COLOURS</button></span></h2>
+      <div class="cam"><img id="cam" src="/stream.mjpg?view=camera" alt=""><div class="badge" id="camBadge">—</div></div>
+    </section>
+    <section class="card">
+      <h2>LOG</h2>
+      <div class="log" id="log"></div>
+    </section>
+  </div>
+
+  <div class="col">
+    <section class="card">
+      <div class="status" id="status"><div class="spin"></div><b id="statusTxt">idle</b><span class="spacer"></span><span class="frame" id="statusSub"></span></div>
+      <button class="act primary" id="mission" style="width:100%">▶ RUN MISSION · A → DIG → B → DUMP</button>
+      <div class="row"><span class="frame">repeat</span><input type="number" id="reps" value="1" min="1" max="20">
+        <span class="spacer"></span><button class="chip" id="swap">SWAP A/B</button></div>
+      <div class="grid3" style="margin-top:10px">
+        <button class="act" data-job="calibrate">CALIBRATE</button>
+        <button class="act" data-job="goA">GO TO A</button>
+        <button class="act" data-job="goB">GO TO B</button>
+        <button class="act" data-job="dig">DIG</button>
+        <button class="act" data-job="dump">DUMP</button>
+        <button class="act" data-job="scene">DETECT SCENE</button>
+      </div>
+      <div class="tele">
+        <div class="ro"><small>X, Y (CM)</small><b id="tPos">—</b></div>
+        <div class="ro"><small>HEADING</small><b id="tHead">—</b></div>
+        <div class="ro"><small>SPEED</small><b id="tFwd">—</b></div>
+        <div class="ro"><small>TURN</small><b id="tTurn">—</b></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>MAP <span class="r"><button class="chip" id="clearTrail">RESET CALIBRATION</button></span></h2>
+      <div class="mapwrap"><canvas id="map" width="720" height="720"></canvas><div class="maphint">click to drive there</div></div>
+    </section>
+
+    <section class="card">
+      <h2>MANUAL <span class="r frame">WASD · ↑↓←→ · L · SPACE</span></h2>
+      <div class="manual">
+        <div class="pad">
+          <div class="k n" data-a="forward">W</div><div class="k w" data-a="left">A</div><div class="k c">DRIVE</div>
+          <div class="k e" data-a="right">D</div><div class="k s" data-a="back">S</div>
+        </div>
+        <div>
+          <div class="sl"><span>THROTTLE</span><input id="speed" type="range" min="15" max="50" value="25"><b id="speedV">25</b></div>
+          <div class="sl"><span>TRIM</span><input id="trim" type="range" min="-30" max="30" value="0"><b id="trimV">0</b></div>
+          <div class="toggles">
+            <button class="chip" data-a2="bucket_up">BOOM ↑</button><button class="chip" data-a2="bucket_down">BOOM ↓</button>
+            <button class="chip" data-a2="turret_left">CAB ←</button><button class="chip" data-a2="turret_right">CAB →</button>
+            <button class="chip" id="lights">LIGHTS</button><button class="chip" id="turnMode">TURN: THROTTLE</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <details id="settings">
+        <summary>SETTINGS · COLOURS · TUNING ▾</summary>
+        <div id="hsv"></div>
+        <div class="num" id="nums"></div>
+        <div class="row"><button class="act" id="save" style="flex:1">SAVE SETTINGS</button></div>
+      </details>
+    </section>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let ST = null, cfgLoaded = false;
+const post = (url, body={}) => fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)}).then(r=>r.json()).catch(()=>({}));
+
+/* ---------- camera view tabs ---------- */
+document.querySelectorAll("#views button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#views button").forEach(x => x.classList.toggle("on", x === b));
+  $("cam").src = "/stream.mjpg?view=" + b.dataset.v + "&t=" + Date.now();
+});
+
+/* ---------- jobs ---------- */
+$("stop").onclick = () => { held.clear(); post("/api/stop"); };
+$("mission").onclick = () => post("/api/mission", {repeats: +$("reps").value || 1});
+$("swap").onclick = () => post("/api/scene/swap");
+$("clearTrail").onclick = () => post("/api/reset_model");
+const JOBS = {calibrate:["/api/calibrate"], goA:["/api/goto_square",{name:"A"}], goB:["/api/goto_square",{name:"B"}],
+  dig:["/api/action",{name:"dig"}], dump:["/api/action",{name:"dump"}], scene:["/api/scene/detect"]};
+document.querySelectorAll("[data-job]").forEach(b => b.onclick = () => post(...JOBS[b.dataset.job]));
+
+/* ---------- map ---------- */
+const cv = $("map"), cx = cv.getContext("2d");
+let mapScale = 1, mapPad = 30;
+cv.addEventListener("click", e => {
+  if (!ST || !ST.scene.ok) return;
+  const r = cv.getBoundingClientRect();
+  const px = (e.clientX - r.left) * cv.width / r.width, py = (e.clientY - r.top) * cv.height / r.height;
+  const x = (px - mapPad) / mapScale, y = (py - mapPad) / mapScale, S = ST.scene.square_cm;
+  if (x < 0 || y < 0 || x > S || y > S) return;
+  post("/api/goto", {x, y});
+});
+function drawMap(){
+  const W = cv.width; cx.clearRect(0,0,W,W);
+  if (!ST || !ST.scene.ok) { cx.fillStyle="#7f8691"; cx.font="20px ui-monospace"; cx.textAlign="center";
+    cx.fillText(ST ? ST.scene.msg : "connecting…", W/2, W/2); return; }
+  const S = ST.scene.square_cm; mapScale = (W - 2*mapPad) / S;
+  const T = (x,y) => [mapPad + x*mapScale, mapPad + y*mapScale];
+  // grid every 10 cm
+  cx.strokeStyle="#1b1f26"; cx.lineWidth=1;
+  for (let g=10; g<S; g+=10){ let [a,b]=T(g,0),[c,d]=T(g,S); cx.beginPath();cx.moveTo(a,b);cx.lineTo(c,d);cx.stroke();
+    [a,b]=T(0,g);[c,d]=T(S,g); cx.beginPath();cx.moveTo(a,b);cx.lineTo(c,d);cx.stroke(); }
+  cx.strokeStyle="#ff4fb8"; cx.lineWidth=5; cx.strokeRect(mapPad, mapPad, S*mapScale, S*mapScale);
+  cx.fillStyle="#7f8691"; cx.font="13px ui-monospace"; cx.textAlign="left";
+  cx.fillText(`${S} cm`, mapPad, mapPad-10); cx.textAlign="center"; cx.fillText("▼ camera side", W/2, W-8);
+  for (const [name,t] of Object.entries(ST.scene.targets)) {
+    cx.beginPath(); t.poly.forEach((p,i)=>{const [a,b]=T(p[0],p[1]); i?cx.lineTo(a,b):cx.moveTo(a,b);}); cx.closePath();
+    cx.fillStyle="#3ddc8422"; cx.fill(); cx.strokeStyle="#3ddc84"; cx.lineWidth=3; cx.stroke();
+    const [a,b]=T(...t.center); cx.fillStyle="#3ddc84"; cx.font="bold 30px ui-monospace"; cx.fillText(name, a, b+10);
+  }
+  if (ST.trail.length > 1) { cx.beginPath(); ST.trail.forEach((p,i)=>{const [a,b]=T(p[0],p[1]); i?cx.lineTo(a,b):cx.moveTo(a,b);});
+    cx.strokeStyle="#3cd7ff88"; cx.lineWidth=2; cx.setLineDash([6,6]); cx.stroke(); cx.setLineDash([]); }
+  if (ST.target) { const [a,b]=T(...ST.target); cx.strokeStyle="#3cd7ff"; cx.lineWidth=3;
+    cx.beginPath(); cx.moveTo(a-12,b); cx.lineTo(a+12,b); cx.moveTo(a,b-12); cx.lineTo(a,b+12); cx.stroke();
+    cx.beginPath(); cx.arc(a,b,ST.cfg.goal_tol_cm*mapScale,0,7); cx.stroke(); }
+  if (ST.robot && !ST.pose) { const [a,b]=T(...ST.robot.center); cx.fillStyle="#f6b90b88"; cx.beginPath(); cx.arc(a,b,10,0,7); cx.fill(); }
+  if (ST.pose) {
+    const [x,y,h]=ST.pose, [a,b]=T(x,y), r = h*Math.PI/180;
+    cx.save(); cx.translate(a,b); cx.rotate(r);
+    cx.fillStyle="#2a2f36"; cx.fillRect(-5.5*mapScale,-2.7*mapScale,11*mapScale,5.4*mapScale);
+    cx.fillStyle="#f6b90b"; cx.fillRect(-3*mapScale,-2*mapScale,6*mapScale,4*mapScale);
+    cx.fillRect(2*mapScale,-0.7*mapScale,4.5*mapScale,1.4*mapScale);
+    cx.fillStyle="#cfd3d9"; cx.fillRect(6.2*mapScale,-1.6*mapScale,1.6*mapScale,3.2*mapScale);
+    cx.restore();
+    cx.strokeStyle="#ff4936"; cx.lineWidth=3; cx.beginPath(); cx.moveTo(a,b);
+    cx.lineTo(a+Math.cos(r)*9*mapScale, b+Math.sin(r)*9*mapScale); cx.stroke();
+  }
+}
+
+/* ---------- manual ---------- */
+const held = new Set(); let lights=false, turnMode="throttle";
+const KEYS = {w:"forward",s:"back",a:"left",d:"right",ArrowUp:"bucket_up",ArrowDown:"bucket_down",ArrowLeft:"turret_left",ArrowRight:"turret_right"};
+const inField = () => ["INPUT","TEXTAREA"].includes(document.activeElement?.tagName) && document.activeElement.type !== "range";
+addEventListener("keydown", e => { if (inField()) return; const k = e.key.length===1 ? e.key.toLowerCase() : e.key;
+  if (KEYS[k]) { held.add(KEYS[k]); e.preventDefault(); } else if (k===" ") { e.preventDefault(); $("stop").click(); }
+  else if (k==="l" && !e.repeat) toggleLights(); });
+addEventListener("keyup", e => { const k = e.key.length===1 ? e.key.toLowerCase() : e.key; if (KEYS[k]) held.delete(KEYS[k]); });
+addEventListener("blur", () => held.clear());
+document.querySelectorAll("[data-a],[data-a2]").forEach(b => { const a = b.dataset.a || b.dataset.a2;
+  b.addEventListener("pointerdown", e => { e.preventDefault(); b.setPointerCapture?.(e.pointerId); held.add(a); });
+  ["pointerup","pointercancel","lostpointercapture"].forEach(ev => b.addEventListener(ev, () => held.delete(a))); });
+function toggleLights(){ lights=!lights; $("lights").classList.toggle("on",lights); }
+$("lights").onclick = toggleLights;
+$("turnMode").onclick = () => { turnMode = turnMode==="throttle" ? "pulse" : "throttle"; $("turnMode").textContent = "TURN: " + turnMode.toUpperCase(); };
+["speed","trim"].forEach(id => $(id).oninput = () => $(id+"V").textContent = $(id).value);
+setInterval(() => {
+  document.querySelectorAll("[data-a],[data-a2]").forEach(b => b.classList.toggle("on", held.has(b.dataset.a || b.dataset.a2)));
+  post("/api/manual", {actions:[...held], speed:+$("speed").value, lights, trim:+$("trim").value, turn_mode:turnMode});
+}, 100);
+
+/* ---------- settings ---------- */
+const NUMS = [["square_cm","Pink square size (cm)"],["drive_speed","Auto drive throttle"],["turn_speed","Auto turn throttle"],
+  ["goal_tol_cm","Arrive tolerance (cm)"],["bucket_offset_cm","Bucket ahead of centre (cm)"],["settle_s","Settle after move (s)"],
+  ["calib_drive_s","Calib drive pulse (s)"],["calib_turn_s","Calib turn pulse (s)"]];
+function buildSettings(cfg){
+  const box = $("hsv"); box.innerHTML = "";
+  for (const color of ["pink","green","yellow"]) {
+    const r = cfg.hsv[color][0], div = document.createElement("div"); div.className = "hsv";
+    div.innerHTML = `<h3 style="color:${{pink:"#ff4fb8",green:"#3ddc84",yellow:"#f6b90b"}[color]}">${color.toUpperCase()}</h3>`;
+    [["H min",0,179],["S min",1,255],["V min",2,255],["H max",3,179]].forEach(([lab,i,max]) => {
+      const row = document.createElement("div"); row.className = "sl";
+      row.innerHTML = `<span>${lab}</span><input type="range" min="0" max="${max}" value="${r[i]}"><b>${r[i]}</b>`;
+      const inp = row.querySelector("input");
+      inp.oninput = () => { row.querySelector("b").textContent = inp.value; cfg.hsv[color][0][i] = +inp.value; };
+      inp.onchange = () => post("/api/config", {set:{hsv:cfg.hsv}});
+      div.appendChild(row);
+    });
+    box.appendChild(div);
+  }
+  const nb = $("nums"); nb.innerHTML = "";
+  for (const [k,lab] of NUMS) {
+    nb.insertAdjacentHTML("beforeend", `<span>${lab}</span><input type="number" step="0.05" data-k="${k}" value="${cfg[k]}">`);
+  }
+  nb.querySelectorAll("input").forEach(i => i.onchange = () => post("/api/config", {set:{[i.dataset.k]: +i.value}}));
+}
+$("save").onclick = () => post("/api/config", {save:true});
+$("settings").addEventListener("toggle", () => { if ($("settings").open) document.querySelector('#views [data-v="mask"]').click(); });
+
+/* ---------- state polling ---------- */
+function pill(id, cls, txt){ const p=$(id); p.className = "pill " + cls; p.lastElementChild.textContent = txt; }
+let lastLog = "";
+async function poll(){
+  try {
+    ST = await (await fetch("/api/state")).json();
+    if (!cfgLoaded) { buildSettings(ST.cfg); cfgLoaded = true;
+      $("speed").value = ST.manual.speed; $("speedV").textContent = ST.manual.speed; }
+    pill("pMode", ST.mode==="live" ? "ok" : "warn", ST.mode.toUpperCase());
+    pill("pCam", ST.camera ? "ok" : "", ST.camera ? `CAMERA ${ST.fps} FPS` : "NO CAMERA");
+    pill("pScene", ST.scene.ok ? (Object.keys(ST.scene.targets).length===2 ? "ok" : "warn") : "", ST.scene.ok ? `SCENE ${Object.keys(ST.scene.targets).join("+") || "–"}` : "NO SCENE");
+    pill("pRobot", ST.robot ? "ok" : "", ST.robot ? "ROBOT SEEN" : "ROBOT LOST");
+    pill("pCal", ST.model ? "ok" : "warn", ST.model ? "CALIBRATED" : "NOT CALIBRATED");
+    $("camBadge").textContent = ST.scene.ok ? ST.scene.msg : ST.scene.msg;
+    $("status").classList.toggle("busy", ST.busy); $("statusTxt").textContent = ST.status;
+    $("statusSub").textContent = ST.busy ? "SPACE / STOP aborts" : "";
+    document.querySelectorAll("[data-job], #mission").forEach(b => b.disabled = ST.busy);
+    const u = ST.uuid || ""; $("frame").innerHTML = u ? `<b>${u.slice(0,2)}</b> ${u.slice(2,8)} · <b>${u.slice(9,13)}</b> · <b>${u.slice(14,18)}</b> · ${ST.frames}` : "";
+    $("tPos").textContent = ST.pose ? `${ST.pose[0].toFixed(1)}, ${ST.pose[1].toFixed(1)}` : (ST.robot ? ST.robot.center.map(v=>v.toFixed(1)).join(", ") : "—");
+    $("tHead").textContent = ST.pose ? Math.round(ST.pose[2]) + "°" : "?";
+    $("tFwd").textContent = ST.model ? ST.model.fwd_cm_s + " cm/s" : "—";
+    $("tTurn").textContent = ST.model ? ST.model.turn_deg_s + " °/s" : "—";
+    $("swap").classList.toggle("on", ST.swap);
+    const logTxt = ST.logs.join("\n");
+    if (logTxt !== lastLog) { lastLog = logTxt; const L = $("log");
+      L.innerHTML = ST.logs.map(l => { const c = /stopped|error|STOP|lost|gave up/i.test(l) ? "err" : /done|Arrived|complete|OK/.test(l) ? "ok" : /Mission|Calibration:/.test(l) ? "hl" : "";
+        return `<div class="${c}">${l.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</div>`; }).join("");
+      L.scrollTop = L.scrollHeight; }
+    drawMap();
+  } catch { pill("pMode","","OFFLINE"); }
+  setTimeout(poll, 200);
+}
+poll();
+</script>
+</body>
+</html>
