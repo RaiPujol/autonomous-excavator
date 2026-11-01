@@ -33,6 +33,7 @@ class State:
         self.speed = 30
         self.d = 0
         self.lights = False
+        self.trim = 0
         self.last_update = 0.0
         self.ctr = 0
         self.uuid = frame_uuid(0, 0, False, 0)
@@ -41,7 +42,8 @@ class State:
 
     def snapshot(self):
         return {"uuid": self.uuid, "ctr": self.ctr, "frames": self.frames,
-                "d": self.d, "speed": self.speed, "lights": self.lights, "mode": self.mode}
+                "d": self.d, "speed": self.speed, "lights": self.lights, "trim": self.trim,
+                "mode": self.mode}
 
 
 S = State()
@@ -86,6 +88,7 @@ class Handler(BaseHTTPRequestHandler):
             S.speed = int(msg.get("speed", S.speed))
             S.d = bits_from_names(msg.get("actions", []))
             S.lights = bool(msg.get("lights", S.lights))
+            S.trim = max(-30, min(30, int(msg.get("trim", S.trim))))
             S.last_update = time.time()
             self._json(S.snapshot())
 
@@ -128,7 +131,7 @@ def main():
             with S.lock:
                 if S.d and time.time() - S.last_update > DEADMAN_S:
                     S.d = 0  # deadman: page went quiet
-                S.uuid = frame_uuid(S.ctr, S.speed, S.lights, S.d)
+                S.uuid = frame_uuid(S.ctr, S.speed, S.lights, S.d, S.trim)
                 S.ctr = (S.ctr + 1) & 0xFF
                 S.frames += 1
                 uuid = S.uuid

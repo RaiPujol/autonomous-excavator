@@ -2,7 +2,10 @@
 
 Frame = one 128-bit service UUID, string order:
     chk ctr 00 14 - A B - C D - ID(8)
-    chk = ctr ^ A ^ B ^ C ^ D ^ 0x08,  B = max(0, A - 16)
+    chk = ctr ^ A ^ B ^ C ^ D ^ 0x08
+
+A and B look like the two track speeds (0-50). The iPhone app sent B = A - 16,
+which makes the toy curve; we send A = B by default and expose a trim.
 """
 
 ID = "3430-34b7067f070c"   # pairing ID copied from Rai's iPhone
@@ -35,9 +38,17 @@ def bits_from_names(names):
     return d
 
 
-def frame_uuid(ctr, speed, lights, d):
-    a = max(0, min(MAX_SPEED, int(speed))) if d & 0x03 else 0
-    b = max(0, a - 16)
+def track_speeds(speed, trim=0):
+    """trim > 0 slows track A, trim < 0 slows track B."""
+    s = max(0, min(MAX_SPEED, int(speed)))
+    t = int(trim)
+    a = s - t if t > 0 else s
+    b = s + t if t < 0 else s
+    return max(0, min(MAX_SPEED, a)), max(0, min(MAX_SPEED, b))
+
+
+def frame_uuid(ctr, speed, lights, d, trim=0):
+    a, b = track_speeds(speed, trim) if d & 0x03 else (0, 0)
     c = LIGHTS if lights else 0
     chk = ctr ^ a ^ b ^ c ^ d ^ 0x08
     return f"{chk:02x}{ctr & 0xFF:02x}0014-{a:02x}{b:02x}-{c:02x}{d:02x}-{ID}"

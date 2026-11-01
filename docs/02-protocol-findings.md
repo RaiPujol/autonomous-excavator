@@ -67,3 +67,7 @@ Next: confirm 0x20, and capture the iPhone's **raw** advert bytes with the ESP32
 ## Replay result (2026-10-31)
 
 `tools/mac_rccar_tx.py` (CoreBluetooth, service-UUID advert, new frame every 100 ms, ID copied from the iPhone) drove the excavator on the first try. No re-pairing needed. Protocol is solved for control purposes.
+
+## Curve on forward (2026-10-31)
+
+Driving forward from the control panel made the excavator go in circles. New hypothesis: **A and B are the two track speeds**, not speed + derived value. The app always sent B = A - 16 (so one track slower, and B = 0 for A <= 16). Changed default to A = B, plus a trim slider (`[` `]`). Trim -16 at speed 50 reproduces the app's frame exactly, for comparison. To verify: which track does A drive?

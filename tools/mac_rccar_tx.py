@@ -57,7 +57,7 @@ class State:
 
 
 def frame_uuid(s):
-    B = max(0, s.A - 16)
+    B = s.A  # equal track speeds; the app's A-16 made it curve
     chk = s.ctr ^ s.A ^ B ^ s.C ^ s.D ^ 0x08
     return f"{chk:02x}{s.ctr:02x}0014-{s.A:02x}{B:02x}-{s.C:02x}{s.D:02x}-{ID}"
 
