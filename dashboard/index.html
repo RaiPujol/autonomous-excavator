@@ -97,6 +97,24 @@
   .seg3 button{font:600 10px var(--mono);letter-spacing:.1em;padding:9px 6px;border-radius:9px;cursor:pointer;background:#1c2027;color:var(--muted);border:1px solid var(--line)}
   .seg3 button.on{background:var(--cyan);color:#06222b;border-color:var(--cyan)}
   .chip.clickmode.on{background:var(--cyan);color:#06222b;border-color:var(--cyan)}
+  .cam .ov{position:absolute;display:flex;align-items:center;gap:5px;background:#000b;padding:5px;border-radius:10px}
+  .cam .ov.tr{right:10px;top:10px} .cam .ov.bl{left:10px;bottom:10px}
+  .cam .ov .ovl{font:600 9px var(--mono);letter-spacing:.14em;color:var(--muted);padding:0 4px}
+  .cam .clickhint{top:auto;bottom:14px;right:10px;left:auto}
+  .cam .badge{max-width:55%}
+  .tabs button:disabled{opacity:.35;cursor:not-allowed}
+  .status .now{font:600 11px var(--mono);color:var(--cyan);letter-spacing:.06em}
+  #cmdBox{margin-bottom:12px}
+  .controls{display:grid;grid-template-columns:auto auto 1fr;gap:22px;align-items:center}
+  .pad{grid-template-columns:repeat(3,52px);grid-template-rows:repeat(3,52px)}
+  .k{font-size:14px;transition:background .08s,box-shadow .08s}
+  .k.c{font-size:8.5px;line-height:1.2;text-align:center}
+  .k.auto{background:var(--cyan);color:#06222b;border-color:var(--cyan);box-shadow:0 0 18px -4px var(--cyan)}
+  .who{font:700 10px var(--mono);letter-spacing:.14em;padding:4px 10px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
+  .who.auto{color:#06222b;background:var(--cyan);border-color:var(--cyan)}
+  .legend{display:flex;align-items:center;gap:6px;margin-top:10px;font:10px var(--mono);color:var(--muted)}
+  .legend .lk{width:10px;height:10px;border-radius:3px;display:inline-block;margin-left:6px} .lk.you{background:var(--yellow)} .lk.auto{background:var(--cyan)}
+  @media (max-width:700px){.controls{grid-template-columns:auto auto}.ctlr{grid-column:1/-1}}
   @media (max-width:1100px){main{grid-template-columns:1fr}}
 </style>
 </head>
@@ -116,25 +134,41 @@
 <main>
   <div class="col">
     <section class="card">
-      <h2>CAMERA <span class="r tabs" id="views">
-        <button data-v="camera" class="on">CAMERA</button><button data-v="topdown">TOP-DOWN</button><button data-v="mask">COLOURS</button></span></h2>
-      <div class="cam" id="camBox"><img id="cam" src="/stream.mjpg?view=camera" alt=""><div class="badge" id="camBadge">—</div><div class="badge clickhint" id="clickHint">click: drive there</div></div>
+      <div class="status" id="status"><div class="spin"></div><b id="statusTxt">idle</b><span class="now" id="now"></span><span class="spacer"></span><span class="frame" id="statusSub"></span></div>
+      <div id="cmdBox" hidden>
+        <div class="cmd"><input id="cmd" placeholder="e.g. dig near the far left corner, then dump next to where you started" autocomplete="off">
+          <button class="act primary" id="send">SEND</button></div>
+        <div class="plan" id="plan"></div>
+      </div>
+      <div class="cam" id="camBox"><img id="cam" src="/stream.mjpg?view=camera" alt="">
+        <div class="badge" id="camBadge">—</div>
+        <div class="ov tr tabs" id="views"><button data-v="camera" class="on">CAMERA</button><button data-v="topdown">TOP-DOWN</button><button data-v="mask">COLOURS</button></div>
+        <div class="ov bl"><span class="ovl">CLICK</span><button class="chip clickmode" data-c="goto">DRIVE TO</button><button class="chip clickmode" data-c="A">SET A</button><button class="chip clickmode" data-c="B">SET B</button></div>
+        <div class="badge clickhint" id="clickHint">click: drive there</div>
+      </div>
     </section>
+
     <section class="card">
-      <h2>COMMAND <span class="r frame" id="vlmState"></span></h2>
-      <div class="cmd"><input id="cmd" placeholder="e.g. dig near the far left corner, then dump next to where you started" autocomplete="off">
-        <button class="act primary" id="send">SEND</button></div>
-      <div class="plan" id="plan"></div>
-    </section>
-    <section class="card">
-      <h2>LOG</h2>
-      <div class="log" id="log"></div>
+      <h2>CONTROLS <span class="frame" style="letter-spacing:.06em">WASD · ↑↓←→ · L · SPACE</span><span class="r"><span class="who" id="who">MANUAL</span></span></h2>
+      <div class="controls">
+        <div class="padbox"><div class="pad">
+          <div class="k n" data-a="forward">W</div><div class="k w" data-a="left">A</div><div class="k c">DRIVE</div>
+          <div class="k e" data-a="right">D</div><div class="k s" data-a="back">S</div></div></div>
+        <div class="padbox"><div class="pad">
+          <div class="k n" data-a="bucket_up">↑</div><div class="k w" data-a="turret_left">←</div><div class="k c">BOOM<br>CAB</div>
+          <div class="k e" data-a="turret_right">→</div><div class="k s" data-a="bucket_down">↓</div></div></div>
+        <div class="ctlr">
+          <div class="sl"><span>THROTTLE</span><input id="speed" type="range" min="15" max="50" value="25"><b id="speedV">25</b></div>
+          <div class="sl"><span>TRIM</span><input id="trim" type="range" min="-30" max="30" value="0"><b id="trimV">0</b></div>
+          <div class="toggles"><button class="chip" id="lights">LIGHTS</button><button class="chip" id="turnMode">TURN: THROTTLE</button></div>
+          <div class="legend"><i class="lk you"></i>you <i class="lk auto"></i>autopilot</div>
+        </div>
+      </div>
     </section>
   </div>
 
   <div class="col">
     <section class="card">
-      <div class="status" id="status"><div class="spin"></div><b id="statusTxt">idle</b><span class="spacer"></span><span class="frame" id="statusSub"></span></div>
       <button class="act primary" id="mission" style="width:100%">▶ RUN MISSION · A → DIG → B → DUMP</button>
       <div class="row"><span class="frame">repeat</span><input type="number" id="reps" value="1" min="1" max="20">
         <span class="spacer"></span><button class="chip" id="swap">SWAP A/B</button></div>
@@ -144,7 +178,7 @@
         <button class="act" data-job="goB">GO TO B</button>
         <button class="act" data-job="dig">DIG</button>
         <button class="act" data-job="dump">DUMP</button>
-        <button class="act" id="clickModeBig" data-c2="goto">CLICK = DRIVE</button>
+        <button class="act" id="clearTrail">RESET CALIB</button>
       </div>
       <div class="tele">
         <div class="ro"><small>X, Y (CM)</small><b id="tPos">—</b></div>
@@ -155,38 +189,16 @@
     </section>
 
     <section class="card">
-      <h2>WORK AREA &amp; TARGETS</h2>
+      <h2>WORK AREA</h2>
       <div class="seg3" id="arenaMode"><button data-m="auto">AUTO</button><button data-m="corners">CLICK CORNERS</button><button data-m="pink">PINK TAPE</button></div>
-      <div class="row" id="sizeRow"><span class="frame">size (cm)</span><input type="number" id="aw" value="100"><span class="frame">×</span><input type="number" id="ah" value="70">
-        <span class="spacer"></span><button class="chip" id="redetect">DETECT AGAIN</button></div>
+      <div class="row" id="sizeRow"><span class="frame">size (cm)</span><input type="number" id="aw" value="100"><span class="frame">×</span><input type="number" id="ah" value="70"></div>
       <div class="frame" id="arenaHelp" style="margin-top:8px"></div>
-      <div class="row"><span class="frame">click sets</span>
-        <button class="chip clickmode" data-c="goto">DRIVE TO</button><button class="chip clickmode" data-c="A">TARGET A</button>
-        <button class="chip clickmode" data-c="B">TARGET B</button><span class="spacer"></span><button class="chip" id="clearT">CLEAR A/B</button></div>
+      <div class="row"><button class="chip" id="redetect">DETECT AGAIN</button><span class="spacer"></span><button class="chip" id="clearT">CLEAR A/B</button></div>
     </section>
 
     <section class="card">
-      <h2>MAP <span class="r"><button class="chip" id="clearTrail">RESET CALIBRATION</button></span></h2>
-      <div class="mapwrap"><canvas id="map" width="720" height="720"></canvas><div class="maphint" id="mapHint">click to drive there</div></div>
-    </section>
-
-    <section class="card">
-      <h2>MANUAL <span class="r frame">WASD · ↑↓←→ · L · SPACE</span></h2>
-      <div class="manual">
-        <div class="pad">
-          <div class="k n" data-a="forward">W</div><div class="k w" data-a="left">A</div><div class="k c">DRIVE</div>
-          <div class="k e" data-a="right">D</div><div class="k s" data-a="back">S</div>
-        </div>
-        <div>
-          <div class="sl"><span>THROTTLE</span><input id="speed" type="range" min="15" max="50" value="25"><b id="speedV">25</b></div>
-          <div class="sl"><span>TRIM</span><input id="trim" type="range" min="-30" max="30" value="0"><b id="trimV">0</b></div>
-          <div class="toggles">
-            <button class="chip" data-a2="bucket_up">BOOM ↑</button><button class="chip" data-a2="bucket_down">BOOM ↓</button>
-            <button class="chip" data-a2="turret_left">CAB ←</button><button class="chip" data-a2="turret_right">CAB →</button>
-            <button class="chip" id="lights">LIGHTS</button><button class="chip" id="turnMode">TURN: THROTTLE</button>
-          </div>
-        </div>
-      </div>
+      <h2>LOG</h2>
+      <div class="log" id="log"></div>
     </section>
 
     <section class="card">
@@ -224,9 +236,8 @@ let clickMode = "goto", curView = "camera";
 const HINT = {goto:"click: drive there", A:"click: place target A", B:"click: place target B", corners:"click the 4 corners"};
 function setClickMode(m){ clickMode = m;
   document.querySelectorAll(".clickmode").forEach(b => b.classList.toggle("on", b.dataset.c === m));
-  $("clickHint").textContent = HINT[m]; $("mapHint").textContent = m === "corners" ? "corners: use the camera view" : HINT[m]; }
+  $("clickHint").textContent = HINT[m]; }
 document.querySelectorAll(".clickmode").forEach(b => b.onclick = () => setClickMode(b.dataset.c));
-$("clickModeBig").onclick = () => setClickMode("goto");
 setClickMode("goto");
 $("cam").addEventListener("click", e => {
   const img = $("cam"), r = img.getBoundingClientRect();
@@ -252,61 +263,9 @@ $("cmd").addEventListener("keydown", e => { if (e.key === "Enter") sendCmd(); e.
 $("cmd").addEventListener("keyup", e => e.stopPropagation());
 document.querySelectorAll("[data-job]").forEach(b => b.onclick = () => post(...JOBS[b.dataset.job]));
 
-/* ---------- map ---------- */
-const cv = $("map"), cx = cv.getContext("2d");
-let mapScale = 1, mapPad = 30;
-cv.addEventListener("click", e => {
-  if (!ST || !ST.scene.ok || clickMode === "corners") return;
-  const r = cv.getBoundingClientRect();
-  const px = (e.clientX - r.left) * cv.width / r.width, py = (e.clientY - r.top) * cv.height / r.height;
-  const x = (px - mapPad) / mapScale, y = (py - mapPad) / mapScale;
-  if (x < 0 || y < 0 || x > ST.scene.w_cm || y > ST.scene.h_cm) return;
-  post("/api/click", {mode: clickMode, view: "map", u: x, v: y}).then(() => { if (clickMode !== "goto") setClickMode("goto"); });
-});
-function drawMap(){
-  const W = cv.width;
-  if (!ST || !ST.scene.ok) { cx.clearRect(0,0,W,cv.height); cx.fillStyle="#7f8691"; cx.font="20px ui-monospace"; cx.textAlign="center";
-    cx.fillText(ST ? ST.scene.msg : "connecting…", W/2, cv.height/2); return; }
-  const SW = ST.scene.w_cm, SH = ST.scene.h_cm;
-  const Hc = Math.round(W * SH / SW + 2*mapPad*(1 - SH/SW));
-  if (cv.height !== Hc) cv.height = Hc;
-  cx.clearRect(0,0,W,cv.height);
-  mapScale = (W - 2*mapPad) / SW;
-  const T = (x,y) => [mapPad + x*mapScale, mapPad + y*mapScale];
-  cx.strokeStyle="#1b1f26"; cx.lineWidth=1;
-  for (let g=10; g<SW; g+=10){ let [a,b]=T(g,0),[c,d]=T(g,SH); cx.beginPath();cx.moveTo(a,b);cx.lineTo(c,d);cx.stroke(); }
-  for (let g=10; g<SH; g+=10){ let [a,b]=T(0,g),[c,d]=T(SW,g); cx.beginPath();cx.moveTo(a,b);cx.lineTo(c,d);cx.stroke(); }
-  if (ST.scene.roi_map) { cx.beginPath(); ST.scene.roi_map.forEach((p,i)=>{const [a,b]=T(p[0],p[1]); i?cx.lineTo(a,b):cx.moveTo(a,b);});
-    cx.closePath(); cx.fillStyle="#3cd7ff10"; cx.fill(); cx.strokeStyle="#3cd7ff"; cx.lineWidth=3; cx.stroke(); }
-  cx.fillStyle="#7f8691"; cx.font="13px ui-monospace"; cx.textAlign="left";
-  cx.fillText(ST.scene.metric ? `${SW.toFixed(0)} × ${SH.toFixed(0)} cm` : "camera view · units ≈ cm near the robot", mapPad, mapPad-10);
-  cx.textAlign="center"; cx.fillText("▼ camera side", W/2, cv.height-8);
-  for (const [name,t] of Object.entries(ST.scene.targets)) {
-    cx.beginPath(); t.poly.forEach((p,i)=>{const [a,b]=T(p[0],p[1]); i?cx.lineTo(a,b):cx.moveTo(a,b);}); cx.closePath();
-    cx.fillStyle="#3ddc8422"; cx.fill(); cx.strokeStyle="#3ddc84"; cx.lineWidth=3; cx.stroke();
-    const [a,b]=T(...t.center); cx.fillStyle="#3ddc84"; cx.font="bold 30px ui-monospace"; cx.fillText(name, a, b+10);
-  }
-  if (ST.trail.length > 1) { cx.beginPath(); ST.trail.forEach((p,i)=>{const [a,b]=T(p[0],p[1]); i?cx.lineTo(a,b):cx.moveTo(a,b);});
-    cx.strokeStyle="#3cd7ff88"; cx.lineWidth=2; cx.setLineDash([6,6]); cx.stroke(); cx.setLineDash([]); }
-  if (ST.target) { const [a,b]=T(...ST.target); cx.strokeStyle="#3cd7ff"; cx.lineWidth=3;
-    cx.beginPath(); cx.moveTo(a-12,b); cx.lineTo(a+12,b); cx.moveTo(a,b-12); cx.lineTo(a,b+12); cx.stroke();
-    cx.beginPath(); cx.arc(a,b,ST.cfg.goal_tol_cm*mapScale,0,7); cx.stroke(); }
-  cx.textAlign="center";
-  if (ST.robot && !ST.pose) { const [a,b]=T(...ST.robot.center); cx.fillStyle="#f6b90b88"; cx.beginPath(); cx.arc(a,b,10,0,7); cx.fill(); }
-  if (ST.pose) {
-    const [x,y,h]=ST.pose, [a,b]=T(x,y), r = h*Math.PI/180;
-    cx.save(); cx.translate(a,b); cx.rotate(r);
-    cx.fillStyle="#2a2f36"; cx.fillRect(-5.5*mapScale,-2.7*mapScale,11*mapScale,5.4*mapScale);
-    cx.fillStyle="#f6b90b"; cx.fillRect(-3*mapScale,-2*mapScale,6*mapScale,4*mapScale);
-    cx.fillRect(2*mapScale,-0.7*mapScale,4.5*mapScale,1.4*mapScale);
-    cx.fillStyle="#cfd3d9"; cx.fillRect(6.2*mapScale,-1.6*mapScale,1.6*mapScale,3.2*mapScale);
-    cx.restore();
-    cx.strokeStyle="#ff4936"; cx.lineWidth=3; cx.beginPath(); cx.moveTo(a,b);
-    cx.lineTo(a+Math.cos(r)*9*mapScale, b+Math.sin(r)*9*mapScale); cx.stroke();
-  }
-}
-
 /* ---------- manual ---------- */
+const BIT = {forward:1,back:2,left:4,right:8,bucket_up:16,bucket_down:32,turret_left:64,turret_right:128};
+const NAME = {forward:"FORWARD",back:"BACK",left:"SPIN LEFT",right:"SPIN RIGHT",bucket_up:"BOOM UP",bucket_down:"BOOM DOWN",turret_left:"CAB LEFT",turret_right:"CAB RIGHT"};
 const held = new Set(); let lights=false, turnMode="throttle";
 const KEYS = {w:"forward",s:"back",a:"left",d:"right",ArrowUp:"bucket_up",ArrowDown:"bucket_down",ArrowLeft:"turret_left",ArrowRight:"turret_right"};
 const inField = () => ["INPUT","TEXTAREA"].includes(document.activeElement?.tagName) && document.activeElement.type !== "range";
@@ -315,7 +274,7 @@ addEventListener("keydown", e => { if (inField()) return; const k = e.key.length
   else if (k==="l" && !e.repeat) toggleLights(); });
 addEventListener("keyup", e => { const k = e.key.length===1 ? e.key.toLowerCase() : e.key; if (KEYS[k]) held.delete(KEYS[k]); });
 addEventListener("blur", () => held.clear());
-document.querySelectorAll("[data-a],[data-a2]").forEach(b => { const a = b.dataset.a || b.dataset.a2;
+document.querySelectorAll("[data-a]").forEach(b => { const a = b.dataset.a;
   b.addEventListener("pointerdown", e => { e.preventDefault(); b.setPointerCapture?.(e.pointerId); held.add(a); });
   ["pointerup","pointercancel","lostpointercapture"].forEach(ev => b.addEventListener(ev, () => held.delete(a))); });
 function toggleLights(){ lights=!lights; $("lights").classList.toggle("on",lights); }
@@ -323,7 +282,9 @@ $("lights").onclick = toggleLights;
 $("turnMode").onclick = () => { turnMode = turnMode==="throttle" ? "pulse" : "throttle"; $("turnMode").textContent = "TURN: " + turnMode.toUpperCase(); };
 ["speed","trim"].forEach(id => $(id).oninput = () => $(id+"V").textContent = $(id).value);
 setInterval(() => {
-  document.querySelectorAll("[data-a],[data-a2]").forEach(b => b.classList.toggle("on", held.has(b.dataset.a || b.dataset.a2)));
+  const d = ST ? ST.out[0] : 0, auto = !!(ST && ST.busy);
+  document.querySelectorAll("[data-a]").forEach(b => { const a = b.dataset.a, live = !!(d & BIT[a]);
+    b.classList.toggle("on", held.has(a) && !auto); b.classList.toggle("auto", auto && live); });
   post("/api/manual", {actions:[...held], speed:+$("speed").value, lights, trim:+$("trim").value, turn_mode:turnMode});
 }, 100);
 
@@ -392,7 +353,11 @@ async function poll(){
         corners:"Click 4 corners of a rectangle of known size on the camera image, then enter its size. Gives true cm.",
         pink:"Pink tape square of the given size."})[ST.cfg.arena_mode];
     if (clickMode === "corners") $("clickHint").textContent = `click corner ${ST.pending_corners + 1}/4`;
-    $("vlmState").textContent = ST.vlm_ready ? "VISION-LANGUAGE PLANNER READY" : "SET ANTHROPIC_API_KEY TO ENABLE";
+    $("cmdBox").hidden = !ST.vlm_ready;
+    { const d = ST.out[0], acts = Object.keys(BIT).filter(k => d & BIT[k]);
+      $("now").textContent = acts.length ? "▶ " + acts.map(k => NAME[k]).join(" + ") + (d & 15 ? ` @${Math.max(ST.out[1], ST.out[2])}` : "") : "";
+      $("who").textContent = ST.busy ? "AUTOPILOT" : "MANUAL"; $("who").classList.toggle("auto", ST.busy);
+      $("lights").classList.toggle("on", ST.manual.lights); }
     $("send").disabled = !ST.vlm_ready || ST.busy;
     if (ST.plan) $("plan").innerHTML = `<b>${ST.plan.say.replace(/</g,"&lt;")}</b>\n` + ST.plan.steps.map(s => "· " + JSON.stringify(s)).join("\n");
     const logTxt = ST.logs.join("\n");
@@ -400,7 +365,6 @@ async function poll(){
       L.innerHTML = ST.logs.map(l => { const c = /stopped|error|STOP|lost|gave up/i.test(l) ? "err" : /done|Arrived|complete|OK/.test(l) ? "ok" : /Mission|Calibration:/.test(l) ? "hl" : "";
         return `<div class="${c}">${l.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</div>`; }).join("");
       L.scrollTop = L.scrollHeight; }
-    drawMap();
   } catch { pill("pMode","","OFFLINE"); }
   setTimeout(poll, 200);
 }

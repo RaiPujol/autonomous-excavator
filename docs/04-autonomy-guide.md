@@ -8,7 +8,7 @@ The excavator finds itself with the iPhone camera, learns how it moves, and driv
    - **AUTO** (default): the uniform surface under the robot, e.g. a blanket. Its outline stops the robot search from picking up the floor around it. Works even if the blanket runs out of the camera view. Distances are in the camera view, scaled by the robot's own length (11 cm) as a ruler.
    - **CLICK CORNERS**: click 4 corners of any rectangle of known size on the camera image, enter its size. Gives true top-down cm.
    - **PINK TAPE**: the original pink tape square.
-2. **Targets.** Click TARGET A / TARGET B, then click on the camera image or the map. (Green tape squares still work automatically.)
+2. **Targets.** Click SET A / SET B (bottom-left of the camera), then click on the camera image. (Green tape squares still work automatically.)
 3. **Robot.** The biggest yellow blob inside the work area.
 4. **Calibration by active perception.** Drives forward, back, spins left and right, watching itself: learns heading, speed, turn rate, which spin is which.
 5. **Move, stop, look.** Short pulses, fresh camera measurement, repeat until the bucket is at the target. Works in the camera view because straight lines on the floor stay straight in the image.
@@ -57,9 +57,9 @@ Open http://localhost:8000, press RUN MISSION. Everything works the same as for 
    python3 dashboard/server.py --cam 1
    ```
 3. Open http://localhost:8000. Check the header: CAMERA, AREA, ROBOT SEEN green. The cyan outline should follow the blanket.
-4. Place targets: TARGET A, click a spot; TARGET B, click another.
+4. Place targets: CLICK SET A, click a spot on the camera; SET B, click another.
 5. Press **CALIBRATE**. Watch it wiggle. The log shows speed and turn rate.
-6. Click anywhere (in DRIVE TO mode) to send it there. Then **RUN MISSION**, or type a command like "dig near the far corner, then dump next to B".
+6. Click anywhere on the camera image (CLICK: DRIVE TO) to send it there. Then **RUN MISSION**, or type a command like "dig near the far corner, then dump next to B".
 7. **STOP** (or Space) halts everything instantly.
 
 ## Dashboard
@@ -67,13 +67,14 @@ Open http://localhost:8000, press RUN MISSION. Everything works the same as for 
 | Area | What |
 |---|---|
 | Header | Status lights, the live Bluetooth frame, STOP |
-| Camera | CAMERA = live view with detections. TOP-DOWN = perspective-corrected map view. COLOURS = what the colour filters see (use when tuning) |
-| Mission card | RUN MISSION (+ repeat count), CALIBRATE, GO TO A/B, DIG, DUMP, SWAP A/B |
-| Work area card | AUTO / CLICK CORNERS / PINK TAPE, DETECT AGAIN, click mode: DRIVE TO / TARGET A / TARGET B |
-| Command | Plain-language request, the plan is shown below it |
-| Map | Work area, robot, heading, trail, targets. **Click to drive there** (or place A/B) |
-| Manual | Same controls as the control panel (WASD, arrows, L, throttle, trim). Disabled during a job |
+| Camera card | Status bar on top (job + the command on air, e.g. `▶ FORWARD @22`). The camera image is the map: click it to drive there, or set A/B with the CLICK buttons. Views: CAMERA, TOP-DOWN (only with CLICK CORNERS or PINK TAPE), COLOURS (for tuning). Plain-language command box appears here only if an API key is set |
+| Controls | WASD and arrow pads, throttle, trim, lights. Yellow = you, cyan = autopilot pressing the keys. Manual input is ignored while a job runs |
+| Mission card | RUN MISSION (+ repeat count), CALIBRATE, GO TO A/B, DIG, DUMP, RESET CALIB, SWAP A/B, telemetry |
+| Work area card | AUTO / CLICK CORNERS / PINK TAPE, DETECT AGAIN, CLEAR A/B |
+| Log | Everything the brain does. The Terminal also prints every motor pulse and any `RADIO GAP` |
 | Settings | Colour sliders (opening it switches to the COLOURS view), sizes, speeds, timings. SAVE SETTINGS writes `autonomy/config.json` |
+
+**Diagnosing shutdowns**: `python3 tools/motion_test.py calib` (or `goto`, `--gentle`, `--app-turns`) replays the autonomy motion without camera or dashboard. If the toy dies there, it is power, not code. First suspect: battery.
 
 ## Tuning when something is off
 
