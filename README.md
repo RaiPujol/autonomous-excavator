@@ -2,6 +2,18 @@
 
 Turning a Trasped 1:64 RC excavator (HG4-301/413 family, "2.4G remote + app" dual control) into an autonomous robot.
 
+## Drive it
+
+```bash
+python3 ui/server.py
+```
+
+Open http://localhost:8000 (or the phone URL it prints, same Wi-Fi). Close the RCCar app first.
+Keys: **WASD** drive, **arrows** boom/turret, **1-5** throttle, **L** lights, **Space** stop. Gamepads work too.
+If the page goes quiet for 0.4 s the excavator stops.
+
+![Control panel](docs/img/ui-desktop.png)
+
 ## Phases
 
 1. **Reverse engineer the app protocol** and control the excavator from an ESP32. Plan: [docs/01-reverse-engineering-plan.md](docs/01-reverse-engineering-plan.md)
@@ -13,6 +25,8 @@ Turning a Trasped 1:64 RC excavator (HG4-301/413 family, "2.4G remote + app" dua
 
 ```
 docs/      write-ups per phase
+excavator/ protocol.py (frame builder), mac_ble.py (CoreBluetooth broadcaster)
+ui/        server.py + index.html (control panel)
 tools/     ble_sniff.py (laptop advert sniffer), parse_btsnoop.py (Android HCI log parser), esp32_ble_scanner
 captures/  raw logs + session notes (what was pressed when)
 ```
@@ -25,6 +39,6 @@ captures/  raw logs + session notes (what was pressed when)
 - [ ] ~~APK decompiled~~ (not needed)
 - [x] **Mac drives the excavator** (`tools/mac_rccar_tx.py`, worked first try, 2026-10-31)
 - [ ] Confirm bucket down = 0x20
-- [ ] Python control API + keyboard teleop
+- [x] Python control API + web control panel (keyboard, touch, gamepad)
 - [ ] Overhead camera + ArUco pose
 - [ ] Go-to-point, then scripted dig/dump

@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>HG4 Excavator Control</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#13161b; --panel2:#181c22; --line:#252a32;
+    --text:#ece9e2; --muted:#7f8691; --yellow:#f6b90b; --yellow-dim:#6b5410;
+    --red:#ff4936; --green:#3ddc84; --mono:ui-monospace,"SF Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;background:var(--bg);color:var(--text);
+    font:14px/1.4 -apple-system,BlinkMacSystemFont,"Inter","Segoe UI",sans-serif;
+    user-select:none;-webkit-user-select:none;overflow:hidden}
+  body{display:grid;grid-template-rows:auto 1fr auto;
+    background:radial-gradient(1200px 600px at 50% 45%,#161a20 0%,var(--bg) 70%)}
+
+  /* header */
+  header{display:flex;align-items:center;gap:18px;padding:14px 22px;border-bottom:1px solid var(--line)}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.14em;font-size:13px}
+  .brand .mark{width:22px;height:22px;border-radius:5px;
+    background:repeating-linear-gradient(-45deg,var(--yellow) 0 5px,#111 5px 10px)}
+  .brand small{color:var(--muted);font-weight:500;letter-spacing:.08em}
+  .spacer{flex:1}
+  .pill{display:flex;align-items:center;gap:8px;padding:6px 12px;border:1px solid var(--line);
+    border-radius:99px;font:600 11px var(--mono);letter-spacing:.08em;color:var(--muted)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 10px var(--red)}
+  .ok .dot{background:var(--green);box-shadow:0 0 10px var(--green)}
+  .ok{color:var(--text)}
+  .frame{font:12px var(--mono);color:var(--muted);padding:6px 12px;border-radius:8px;
+    background:var(--panel);border:1px solid var(--line);min-width:420px;text-align:center}
+  .frame b{color:var(--yellow);font-weight:600}
+  .frame i{font-style:normal;color:var(--text)}
+
+  /* main */
+  main{display:grid;grid-template-columns:minmax(260px,1fr) minmax(320px,1.3fr) minmax(260px,1fr);
+    gap:22px;padding:22px;align-items:center;min-height:0}
+  .card{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);
+    border-radius:20px;padding:20px;display:flex;flex-direction:column;align-items:center;gap:18px}
+  .card h2{align-self:stretch;display:flex;justify-content:space-between;
+    font:600 11px var(--mono);letter-spacing:.16em;color:var(--muted)}
+  .card h2 span:last-child{color:var(--yellow-dim)}
+
+  .pad{display:grid;grid-template-columns:repeat(3,76px);grid-template-rows:repeat(3,76px);gap:8px}
+  .btn{border:1px solid var(--line);border-radius:16px;background:#1c2027;color:var(--text);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    font:600 10px var(--mono);letter-spacing:.1em;cursor:pointer;touch-action:none;
+    transition:background .08s,border-color .08s,transform .08s,box-shadow .08s;
+    box-shadow:inset 0 -3px 0 #0d0f12}
+  .btn svg{width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+  .btn kbd{font:500 9px var(--mono);color:var(--muted)}
+  .btn.on{background:var(--yellow);color:#111;border-color:var(--yellow);transform:translateY(2px);
+    box-shadow:0 0 28px -4px var(--yellow),inset 0 -1px 0 #0003}
+  .btn.on kbd{color:#0008}
+  .hub{border-radius:50%;width:56px;height:56px;margin:auto;background:#101317;border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;color:var(--muted);font:600 9px var(--mono)}
+  .n{grid-area:1/2}.w{grid-area:2/1}.c{grid-area:2/2}.e{grid-area:2/3}.s{grid-area:3/2}
+
+  .speed{align-self:stretch}
+  .speed .row{display:flex;justify-content:space-between;font:600 11px var(--mono);color:var(--muted);
+    letter-spacing:.12em;margin-bottom:10px}
+  .speed .row b{color:var(--yellow);font-size:20px;letter-spacing:0}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:8px;border-radius:99px;
+    background:linear-gradient(90deg,var(--yellow) var(--p,60%),#232830 var(--p,60%));outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;
+    background:#fff;border:4px solid var(--yellow);box-shadow:0 2px 10px #0008;cursor:grab}
+  input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:#fff;border:4px solid var(--yellow)}
+  .ticks{display:flex;justify-content:space-between;font:10px var(--mono);color:#4b515b;margin-top:6px}
+
+  /* viz */
+  .viz{position:relative;aspect-ratio:1;width:min(100%,46vh);margin:auto}
+  .viz svg{width:100%;height:100%;overflow:visible}
+  .grid line{stroke:#1d2128;stroke-width:1}
+  .track{fill:#1b1f25;stroke:#2c323b;stroke-width:2}
+  .tread{stroke:#3a414c;stroke-width:3;stroke-dasharray:4 6}
+  .moving .tread{stroke:var(--yellow);animation:tread .35s linear infinite}
+  .moving.rev .tread{animation-direction:reverse}
+  .trackL.spinF .tread,.trackR.spinF .tread{stroke:var(--yellow);animation:tread .35s linear infinite}
+  .trackL.spinB .tread,.trackR.spinB .tread{stroke:var(--yellow);animation:tread .35s linear infinite reverse}
+  @keyframes tread{to{stroke-dashoffset:-20}}
+  .hull{fill:#20252c;stroke:#323943;stroke-width:2}
+  .cab{transition:transform .1s linear}
+  .cab .body{fill:var(--yellow);stroke:#8a6a06;stroke-width:2}
+  .cab .glass{fill:#0e1114;opacity:.9}
+  .cab .arm{stroke:var(--yellow);stroke-width:10;stroke-linecap:round;transition:all .25s}
+  .cab .bucket{fill:#3b4049;stroke:#626a76;stroke-width:2;transition:all .25s}
+  .beam{fill:url(#beam);opacity:0;transition:opacity .2s}
+  .lit .beam{opacity:1}
+  .lamp{fill:#444;transition:fill .2s}
+  .lit .lamp{fill:#fff6c4;filter:drop-shadow(0 0 6px #ffe680)}
+  .readouts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%}
+  .ro{background:#101317;border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+  .ro small{display:block;font:600 9px var(--mono);letter-spacing:.14em;color:var(--muted)}
+  .ro b{font:600 16px var(--mono)}
+
+  /* footer */
+  footer{display:flex;align-items:center;gap:14px;padding:14px 22px;border-top:1px solid var(--line)}
+  .toggle{display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:12px;border:1px solid var(--line);
+    background:var(--panel);font:600 11px var(--mono);letter-spacing:.12em;cursor:pointer}
+  .toggle .sw{width:34px;height:20px;border-radius:99px;background:#2a3038;position:relative;transition:.15s}
+  .toggle .sw::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#9aa1ab;transition:.15s}
+  .toggle.on{border-color:var(--yellow-dim)}
+  .toggle.on .sw{background:var(--yellow)}
+  .toggle.on .sw::after{left:17px;background:#111}
+  .hints{font:11px var(--mono);color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+  .hints kbd{color:var(--text);background:#1c2027;border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+  .estop{position:relative;border:none;border-radius:14px;padding:14px 26px;cursor:pointer;
+    font:800 13px var(--mono);letter-spacing:.2em;color:#fff;background:var(--red);
+    box-shadow:0 0 0 3px #111,0 0 0 6px var(--red),0 0 40px -6px var(--red)}
+  .estop::before{content:"";position:absolute;inset:-9px;border-radius:19px;z-index:-1;
+    background:repeating-linear-gradient(-45deg,var(--yellow) 0 8px,#111 8px 16px)}
+  .estop:active{transform:scale(.97)}
+  .flash{animation:flash .5s}
+  @keyframes flash{0%{box-shadow:inset 0 0 0 9999px #ff493633}100%{box-shadow:none}}
+
+  @media (max-width:980px){
+    html,body{overflow:auto;height:auto;min-height:100%}
+    body{display:block}
+    header{flex-wrap:wrap;gap:10px;padding:12px 14px}
+    .brand small,.frame,#pad{display:none}
+    main{grid-template-columns:1fr 1fr;padding:14px;gap:14px}
+    main>*{min-width:0}
+    .center{grid-column:1/-1;order:-1}
+    .viz{width:min(100%,30vh)}
+    footer{position:sticky;bottom:0;background:#0b0d10ee;backdrop-filter:blur(8px);padding:12px 14px}
+    footer .hints{display:none}
+  }
+  @media (max-width:620px){
+    main{grid-template-columns:1fr}
+    .card{padding:16px;gap:14px}
+    .pad{grid-template-columns:repeat(3,80px);grid-template-rows:repeat(3,80px)}
+    .readouts .ro b{font-size:13px}
+  }
+  /* phone held sideways: controller layout, no scrolling */
+  @media (max-height:520px) and (orientation:landscape){
+    html,body{height:100%;overflow:hidden}
+    body{display:grid;grid-template-rows:auto 1fr auto}
+    header{padding:6px 14px}
+    .brand small,.frame,#pad{display:none}
+    main{grid-template-columns:1fr 1.1fr 1fr;padding:8px 12px;gap:10px}
+    .center{grid-column:auto;order:0}
+    .card{padding:10px;gap:8px;border-radius:16px}
+    .card h2,.hints,.readouts .ro:last-child{display:none}
+    .pad{grid-template-columns:repeat(3,62px);grid-template-rows:repeat(3,62px);gap:6px}
+    .hub{width:40px;height:40px}
+    .viz{width:min(100%,38vh)}
+    .readouts{grid-template-columns:1fr 1fr;gap:6px}
+    .ro{padding:6px 8px}.ro b{font-size:12px}
+    .speed .row{margin-bottom:4px}.ticks{display:none}
+    footer{position:static;padding:6px 14px}
+    .estop{padding:10px 20px}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="mark"></div>HG4 EXCAVATOR <small>/ RCCAR LINK</small></div>
+  <div class="spacer"></div>
+  <div class="frame" id="frame">waiting for server…</div>
+  <div class="pill" id="link"><span class="dot"></span><span id="linkTxt">OFFLINE</span></div>
+  <div class="pill" id="pad"><span>🎮</span><span id="padTxt">NO GAMEPAD</span></div>
+</header>
+
+<main>
+  <section class="card">
+    <h2><span>DRIVE</span><span>W A S D</span></h2>
+    <div class="pad">
+      <button class="btn n" data-a="forward"><svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg><kbd>W</kbd></button>
+      <button class="btn w" data-a="left"><svg viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg><kbd>A</kbd></button>
+      <div class="c hub">TRACKS</div>
+      <button class="btn e" data-a="right"><svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg><kbd>D</kbd></button>
+      <button class="btn s" data-a="back"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></svg><kbd>S</kbd></button>
+    </div>
+    <div class="speed">
+      <div class="row"><span>THROTTLE</span><b id="spdVal">30</b></div>
+      <input id="speed" type="range" min="5" max="50" step="1" value="30">
+      <div class="ticks"><span>5</span><span>15</span><span>25</span><span>35</span><span>50</span></div>
+    </div>
+  </section>
+
+  <section class="card center">
+    <h2><span>LIVE</span><span id="modeTxt">—</span></h2>
+    <div class="viz" id="viz">
+      <svg viewBox="-150 -150 300 300">
+        <defs>
+          <radialGradient id="beam" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse"
+            gradientTransform="translate(0 -40) scale(80 120)">
+            <stop offset="0" stop-color="#fff2a8" stop-opacity=".55"/>
+            <stop offset="1" stop-color="#fff2a8" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <g class="grid">
+          <line x1="-150" y1="-100" x2="150" y2="-100"/><line x1="-150" y1="-50" x2="150" y2="-50"/>
+          <line x1="-150" y1="0" x2="150" y2="0"/><line x1="-150" y1="50" x2="150" y2="50"/>
+          <line x1="-150" y1="100" x2="150" y2="100"/><line x1="-100" y1="-150" x2="-100" y2="150"/>
+          <line x1="-50" y1="-150" x2="-50" y2="150"/><line x1="0" y1="-150" x2="0" y2="150"/>
+          <line x1="50" y1="-150" x2="50" y2="150"/><line x1="100" y1="-150" x2="100" y2="150"/>
+        </g>
+        <g id="trackL" class="trackL"><rect class="track" x="-62" y="-70" width="26" height="140" rx="13"/>
+          <line class="tread" x1="-49" y1="-62" x2="-49" y2="62"/></g>
+        <g id="trackR" class="trackR"><rect class="track" x="36" y="-70" width="26" height="140" rx="13"/>
+          <line class="tread" x1="49" y1="-62" x2="49" y2="62"/></g>
+        <rect class="hull" x="-38" y="-50" width="76" height="100" rx="10"/>
+        <g class="cab" id="cab">
+          <path class="beam" d="M-40 -60 L-120 -170 L120 -170 L40 -60 Z"/>
+          <line class="arm" id="arm" x1="0" y1="-10" x2="0" y2="-95"/>
+          <rect class="bucket" id="bucket" x="-16" y="-118" width="32" height="22" rx="5"/>
+          <rect class="body" x="-30" y="-30" width="60" height="62" rx="12"/>
+          <rect class="glass" x="-24" y="-24" width="20" height="22" rx="4"/>
+          <circle class="lamp" cx="-18" cy="-32" r="4"/><circle class="lamp" cx="18" cy="-32" r="4"/>
+        </g>
+      </svg>
+    </div>
+    <div class="readouts">
+      <div class="ro"><small>TURRET (EST.)</small><b id="roTurret">0°</b></div>
+      <div class="ro"><small>ACTIVE</small><b id="roActive">IDLE</b></div>
+      <div class="ro"><small>FRAMES</small><b id="roFrames">0</b></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2><span>ARM</span><span>↑ ↓ ← →</span></h2>
+    <div class="pad">
+      <button class="btn n" data-a="bucket_up"><svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/><path d="M4 20h16"/></svg>BOOM<kbd>↑</kbd></button>
+      <button class="btn w" data-a="turret_left"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 3-6.2"/><path d="M7 2v4h4"/></svg><kbd>←</kbd></button>
+      <div class="c hub">CAB</div>
+      <button class="btn e" data-a="turret_right"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-3-6.2"/><path d="M17 2v4h-4"/></svg><kbd>→</kbd></button>
+      <button class="btn s" data-a="bucket_down"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/><path d="M4 4h16"/></svg>BOOM<kbd>↓</kbd></button>
+    </div>
+    <div class="hints" style="justify-content:center">
+      <span><kbd>1</kbd>–<kbd>5</kbd> throttle</span><span><kbd>L</kbd> lights</span><span><kbd>Space</kbd> stop</span>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="toggle" id="lights"><div class="sw"></div>LIGHTS</div>
+  <div class="hints"><span>Hold to move · release to stop</span><span>Gamepad: left stick drive · right stick arm · A lights · B stop</span></div>
+  <div class="spacer"></div>
+  <button class="estop" id="estop">STOP</button>
+</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+const held = new Set();          // actions from buttons + keys
+let padActs = new Set(), padSpeed = null;
+let lights = false, turret = 0, boom = 0, lastT = performance.now();
+const speedEl = $("speed");
+
+/* ---------- inputs: buttons ---------- */
+document.querySelectorAll(".btn[data-a]").forEach(b => {
+  const a = b.dataset.a;
+  const on = e => { e.preventDefault(); b.setPointerCapture?.(e.pointerId); held.add(a); };
+  const off = () => held.delete(a);
+  b.addEventListener("pointerdown", on);
+  ["pointerup","pointercancel","lostpointercapture"].forEach(ev => b.addEventListener(ev, off));
+  b.addEventListener("contextmenu", e => e.preventDefault());
+});
+
+/* ---------- inputs: keyboard ---------- */
+const KEYS = {w:"forward",s:"back",a:"left",d:"right",
+  ArrowUp:"bucket_up",ArrowDown:"bucket_down",ArrowLeft:"turret_left",ArrowRight:"turret_right"};
+addEventListener("keydown", e => {
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if (KEYS[k]) { held.add(KEYS[k]); e.preventDefault(); }
+  else if (k === " ") { e.preventDefault(); estop(); }
+  else if (k === "l" && !e.repeat) toggleLights();
+  else if (k >= "1" && k <= "5") setSpeed(+k * 10);
+});
+addEventListener("keyup", e => {
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if (KEYS[k]) held.delete(KEYS[k]);
+});
+addEventListener("blur", () => held.clear());   // tab lost focus: release everything
+
+/* ---------- speed + lights + estop ---------- */
+function setSpeed(v){ speedEl.value = v; paintSpeed(); }
+function paintSpeed(){
+  const v = +speedEl.value; $("spdVal").textContent = v;
+  speedEl.style.setProperty("--p", ((v-5)/45*100) + "%");
+}
+speedEl.addEventListener("input", paintSpeed); paintSpeed();
+function toggleLights(){ lights = !lights; $("lights").classList.toggle("on", lights); $("viz").classList.toggle("lit", lights); }
+$("lights").addEventListener("click", toggleLights);
+function estop(){ held.clear(); padActs.clear(); send(); document.body.classList.remove("flash"); void document.body.offsetWidth; document.body.classList.add("flash"); }
+$("estop").addEventListener("click", estop);
+
+/* ---------- gamepad ---------- */
+let prevA = false, prevB = false;
+function pollPad(){
+  const gp = [...(navigator.getGamepads?.() || [])].find(Boolean);
+  $("padTxt").textContent = gp ? "GAMEPAD" : "NO GAMEPAD";
+  $("pad").classList.toggle("ok", !!gp);
+  padActs = new Set(); padSpeed = null;
+  if (!gp) return;
+  const [lx, ly, rx, ry] = gp.axes, dz = 0.35;
+  if (ly < -dz) padActs.add("forward"); if (ly > dz) padActs.add("back");
+  if (lx < -dz) padActs.add("left");    if (lx > dz) padActs.add("right");
+  if (ry < -dz) padActs.add("bucket_up"); if (ry > dz) padActs.add("bucket_down");
+  if (rx < -dz) padActs.add("turret_left"); if (rx > dz) padActs.add("turret_right");
+  if (Math.abs(ly) > dz) padSpeed = Math.round(5 + (Math.abs(ly) - dz) / (1 - dz) * (+speedEl.value - 5));
+  const a = gp.buttons[0]?.pressed, b = gp.buttons[1]?.pressed;
+  if (a && !prevA) toggleLights(); if (b && !prevB) estop();
+  prevA = a; prevB = b;
+}
+
+/* ---------- link to server ---------- */
+let inflight = false, okUntil = 0;
+function actions(){ return [...new Set([...held, ...padActs])]; }
+async function send(){
+  if (inflight) return; inflight = true;
+  const acts = actions();
+  try {
+    const r = await fetch("/api/state", {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({actions: acts, speed: padSpeed ?? +speedEl.value, lights})});
+    const s = await r.json();
+    okUntil = performance.now() + 1000;
+    const u = s.uuid;
+    $("frame").innerHTML = `<b>${u.slice(0,2)}</b> <i>${u.slice(2,4)}</i> ${u.slice(4,8)} · <b>${u.slice(9,11)}</b> ${u.slice(11,13)} · <b>${u.slice(14,16)}</b> <b>${u.slice(16,18)}</b> · ${u.slice(19)}`;
+    $("roFrames").textContent = s.frames.toLocaleString();
+    $("modeTxt").textContent = s.mode === "ble" ? "BLE BROADCAST" : "DRY RUN";
+  } catch { okUntil = 0; }
+  inflight = false;
+}
+
+/* ---------- render loop ---------- */
+function frame(t){
+  const dt = Math.min(0.1, (t - lastT) / 1000); lastT = t;
+  pollPad();
+  const acts = new Set(actions());
+  document.querySelectorAll(".btn[data-a]").forEach(b => b.classList.toggle("on", acts.has(b.dataset.a)));
+  const f = acts.has("forward") && !acts.has("back"), bk = acts.has("back") && !acts.has("forward");
+  const l = acts.has("left") && !acts.has("right"), r = acts.has("right") && !acts.has("left");
+  const L = $("trackL"), R = $("trackR");
+  L.className.baseVal = "trackL" + (f ? " spinF" : bk ? " spinB" : r ? " spinF" : l ? " spinB" : "");
+  R.className.baseVal = "trackR" + (f ? " spinF" : bk ? " spinB" : l ? " spinF" : r ? " spinB" : "");
+  if (acts.has("turret_left") && !acts.has("turret_right")) turret -= 60 * dt;
+  if (acts.has("turret_right") && !acts.has("turret_left")) turret += 60 * dt;
+  turret = Math.max(-135, Math.min(135, turret));            // 270° range
+  if (acts.has("bucket_up")) boom = Math.min(1, boom + dt);
+  if (acts.has("bucket_down")) boom = Math.max(0, boom - dt);
+  $("cab").setAttribute("transform", `rotate(${turret.toFixed(1)})`);
+  const tip = -95 - boom * 30;
+  $("arm").setAttribute("y2", tip); $("bucket").setAttribute("y", tip - 23);
+  $("roTurret").textContent = Math.round(turret) + "°";
+  $("roActive").textContent = acts.size ? [...acts].map(a => a.replace("_"," ").replace("bucket","boom").toUpperCase()).join(" + ") : "IDLE";
+  $("roActive").style.fontSize = acts.size > 1 ? "11px" : "";
+  const ok = performance.now() < okUntil;
+  $("link").classList.toggle("ok", ok); $("linkTxt").textContent = ok ? "LINKED" : "OFFLINE";
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+setInterval(send, 100);   // heartbeat: server stops the excavator if this goes quiet
+</script>
+</body>
+</html>
