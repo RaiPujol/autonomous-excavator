@@ -1,33 +1,32 @@
 # Autonomy: setup and run
 
-The excavator finds itself with the iPhone camera, learns how it moves, drives to square A, digs, drives to square B, dumps. No markers, phone placed anywhere.
+The excavator finds itself with the iPhone camera, learns how it moves, and drives wherever you click or tell it. No markers, no tape needed, phone placed anywhere.
 
 ## How it works (short)
 
-1. **Scene.** The pink tape square has a known size, so its 4 corners give the perspective correction (homography) from the angled camera image to a top-down map in cm. The two green squares inside become targets A and B.
-2. **Robot.** The biggest yellow blob inside the pink square. Its centre and long axis are measured in the top-down map.
-3. **Calibration by active perception.** Drives forward 0.6 s, back, spins left, spins right, watching itself. Learns: which way it faces, cm/s, deg/s, and which spin direction is which.
-4. **Move, stop, look.** Short turn or drive pulses, then a fresh camera measurement, repeat until the bucket is over the target.
-5. **Mission.** Go to A, dig (boom down, creep forward, boom up), go to B, dump (turret 90°, boom down/up, turret back), repeat.
+1. **Work area.** Three ways, pick in the dashboard (WORK AREA card):
+   - **AUTO** (default): the uniform surface under the robot, e.g. a blanket. Its outline stops the robot search from picking up the floor around it. Works even if the blanket runs out of the camera view. Distances are in the camera view, scaled by the robot's own length (11 cm) as a ruler.
+   - **CLICK CORNERS**: click 4 corners of any rectangle of known size on the camera image, enter its size. Gives true top-down cm.
+   - **PINK TAPE**: the original pink tape square.
+2. **Targets.** Click TARGET A / TARGET B, then click on the camera image or the map. (Green tape squares still work automatically.)
+3. **Robot.** The biggest yellow blob inside the work area.
+4. **Calibration by active perception.** Drives forward, back, spins left and right, watching itself: learns heading, speed, turn rate, which spin is which.
+5. **Move, stop, look.** Short pulses, fresh camera measurement, repeat until the bucket is at the target. Works in the camera view because straight lines on the floor stay straight in the image.
+6. **Mission / commands.** RUN MISSION = A, dig, B, dump. Or type a request in COMMAND (needs an API key, see below).
 
-Tested in the simulator: 11/11 missions completed from random start positions, arriving within ~1-3.5 cm.
+Tested in the simulator: 17/17 missions from random start poses (metric and camera-view modes).
 
 ## Setup (once)
 
-**Floor**
-- Pink tape square, **60 cm** side measured outer edge to outer edge (any size works, enter it in Settings).
-- Two green tape squares inside, ~12-15 cm, not touching the pink tape or each other.
-- Plain floor that is not yellow, pink or green. Even lighting, no strong sun patches.
+**Surface**: something plain under the robot that is not yellow (your blue blanket is ideal). Even lighting.
 
-**Phone**
-- On the table, angled down at the square, **the whole pink square visible** with a margin. Landscape.
-- It must not move during a run. If you move it, press DETECT SCENE.
+**Phone**: on the table, angled down at the area, landscape. It must not move during a run (if it does, DETECT AGAIN).
 
 **Mac**
 ```bash
 cd ~/autonomous-excavator
 git pull
-pip install opencv-contrib-python
+pip install opencv-contrib-python anthropic
 ```
 Allow Camera for Terminal: System Settings → Privacy & Security → Camera → Terminal on.
 
@@ -35,7 +34,13 @@ Allow Camera for Terminal: System Settings → Privacy & Security → Camera →
 ```bash
 python3 tools/camera_check.py --list
 ```
-iPhone and Mac on the same Apple ID, Wi-Fi and Bluetooth on. The iPhone is usually the highest number. Check with `python3 tools/camera_check.py --cam 1` (q to close).
+iPhone and Mac on the same Apple ID, Wi-Fi and Bluetooth on. The iPhone is usually the highest number.
+
+**Plain-language commands (optional)**: get an API key at console.anthropic.com, then before starting the dashboard:
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+```
+The planner (Claude, model set in `autonomy/config.py` as `vlm_model`) sees the camera image with a coordinate grid drawn on it and returns a short JSON plan (go to x,y / dig / dump / set targets). The normal navigation executes it, so the STOP button and all safety still apply. Any point outside the work area is rejected.
 
 ## Try the simulator first (no hardware)
 
@@ -51,10 +56,11 @@ Open http://localhost:8000, press RUN MISSION. Everything works the same as for 
    ```bash
    python3 dashboard/server.py --cam 1
    ```
-3. Open http://localhost:8000. Check the header: CAMERA, SCENE A+B, ROBOT SEEN all green.
-4. Press **CALIBRATE**. Watch it wiggle. The log shows cm/s and deg/s.
-5. Press **GO TO A**, or click anywhere on the map. Then **RUN MISSION**.
-6. **STOP** (or Space) halts everything instantly.
+3. Open http://localhost:8000. Check the header: CAMERA, AREA, ROBOT SEEN green. The cyan outline should follow the blanket.
+4. Place targets: TARGET A, click a spot; TARGET B, click another.
+5. Press **CALIBRATE**. Watch it wiggle. The log shows speed and turn rate.
+6. Click anywhere (in DRIVE TO mode) to send it there. Then **RUN MISSION**, or type a command like "dig near the far corner, then dump next to B".
+7. **STOP** (or Space) halts everything instantly.
 
 ## Dashboard
 
@@ -71,8 +77,9 @@ Open http://localhost:8000, press RUN MISSION. Everything works the same as for 
 
 | Symptom | Fix |
 |---|---|
-| NO SCENE / pink not found | Settings → PINK: lower S min / V min until the tape is solid in COLOURS view, and nothing else is |
-| Only 1 green square | Same for GREEN. Squares must be inside the pink one |
+| NO WORK AREA (auto) | The surface under the robot isn't uniform enough: raise "Work area colour tolerance" in Settings, or use CLICK CORNERS |
+| Cyan outline leaks onto the floor | Lower "Work area colour tolerance" |
+| ROBOT LOST although it's visible | It's outside the outline, or YELLOW sliders need widening (COLOURS view) |
 | A and B the wrong way round | SWAP A/B |
 | ROBOT LOST | Settings → YELLOW. Make sure the floor isn't picked up |
 | Calibration "only moved X cm" | Raise Auto drive throttle or Calib drive pulse |
@@ -89,6 +96,7 @@ autonomy/config.py   settings + defaults
 autonomy/vision.py   tape squares, homography, robot blob, overlays
 autonomy/brain.py    calibration, go-to, dig/dump, mission
 autonomy/sim.py      simulated camera + excavator
+autonomy/vlm.py      plain-language commands -> plan (Claude vision)
 dashboard/server.py  camera + brain + Bluetooth + web server
 dashboard/index.html the dashboard
 ```

@@ -41,7 +41,7 @@
   .log .hl{color:var(--yellow)} .log .err{color:var(--red)} .log .ok{color:var(--green)}
 
   .mapwrap{position:relative}
-  canvas#map{width:100%;aspect-ratio:1;display:block;border-radius:12px;background:#0d1013;border:1px solid var(--line);cursor:crosshair}
+  canvas#map{width:100%;display:block;border-radius:12px;background:#0d1013;border:1px solid var(--line);cursor:crosshair}
   .maphint{position:absolute;right:10px;bottom:8px;font:10px var(--mono);color:var(--muted)}
 
   .status{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:#0d1013;border:1px solid var(--line);margin-bottom:12px}
@@ -84,6 +84,19 @@
   .hsv h3{font:600 10px var(--mono);letter-spacing:.12em;margin-bottom:4px}
   .num{display:grid;grid-template-columns:1fr 70px;gap:6px 10px;align-items:center;font:600 10px var(--mono);color:var(--muted);letter-spacing:.06em}
   .num input{background:#0d1013;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:6px 8px;font:12px var(--mono);width:100%}
+  .cam img{cursor:crosshair}
+  .cam .clickhint{left:auto;right:10px;color:var(--cyan)}
+  .cam .badge{max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cmd{display:flex;gap:8px}
+  .cmd input{flex:1;background:#0d1013;border:1px solid var(--line);color:var(--text);border-radius:10px;padding:12px 14px;font:13px -apple-system,sans-serif;outline:none}
+  .cmd input:focus{border-color:var(--yellow)}
+  .cmd .act{padding:10px 18px}
+  .plan{font:11.5px/1.5 var(--mono);color:#b9bec6;margin-top:8px;white-space:pre-wrap}
+  .plan b{color:var(--yellow)}
+  .seg3{display:grid;grid-template-columns:1fr 1.3fr 1fr;gap:6px}
+  .seg3 button{font:600 10px var(--mono);letter-spacing:.1em;padding:9px 6px;border-radius:9px;cursor:pointer;background:#1c2027;color:var(--muted);border:1px solid var(--line)}
+  .seg3 button.on{background:var(--cyan);color:#06222b;border-color:var(--cyan)}
+  .chip.clickmode.on{background:var(--cyan);color:#06222b;border-color:var(--cyan)}
   @media (max-width:1100px){main{grid-template-columns:1fr}}
 </style>
 </head>
@@ -105,7 +118,13 @@
     <section class="card">
       <h2>CAMERA <span class="r tabs" id="views">
         <button data-v="camera" class="on">CAMERA</button><button data-v="topdown">TOP-DOWN</button><button data-v="mask">COLOURS</button></span></h2>
-      <div class="cam"><img id="cam" src="/stream.mjpg?view=camera" alt=""><div class="badge" id="camBadge">—</div></div>
+      <div class="cam" id="camBox"><img id="cam" src="/stream.mjpg?view=camera" alt=""><div class="badge" id="camBadge">—</div><div class="badge clickhint" id="clickHint">click: drive there</div></div>
+    </section>
+    <section class="card">
+      <h2>COMMAND <span class="r frame" id="vlmState"></span></h2>
+      <div class="cmd"><input id="cmd" placeholder="e.g. dig near the far left corner, then dump next to where you started" autocomplete="off">
+        <button class="act primary" id="send">SEND</button></div>
+      <div class="plan" id="plan"></div>
     </section>
     <section class="card">
       <h2>LOG</h2>
@@ -125,7 +144,7 @@
         <button class="act" data-job="goB">GO TO B</button>
         <button class="act" data-job="dig">DIG</button>
         <button class="act" data-job="dump">DUMP</button>
-        <button class="act" data-job="scene">DETECT SCENE</button>
+        <button class="act" id="clickModeBig" data-c2="goto">CLICK = DRIVE</button>
       </div>
       <div class="tele">
         <div class="ro"><small>X, Y (CM)</small><b id="tPos">—</b></div>
@@ -136,8 +155,19 @@
     </section>
 
     <section class="card">
+      <h2>WORK AREA &amp; TARGETS</h2>
+      <div class="seg3" id="arenaMode"><button data-m="auto">AUTO</button><button data-m="corners">CLICK CORNERS</button><button data-m="pink">PINK TAPE</button></div>
+      <div class="row" id="sizeRow"><span class="frame">size (cm)</span><input type="number" id="aw" value="100"><span class="frame">×</span><input type="number" id="ah" value="70">
+        <span class="spacer"></span><button class="chip" id="redetect">DETECT AGAIN</button></div>
+      <div class="frame" id="arenaHelp" style="margin-top:8px"></div>
+      <div class="row"><span class="frame">click sets</span>
+        <button class="chip clickmode" data-c="goto">DRIVE TO</button><button class="chip clickmode" data-c="A">TARGET A</button>
+        <button class="chip clickmode" data-c="B">TARGET B</button><span class="spacer"></span><button class="chip" id="clearT">CLEAR A/B</button></div>
+    </section>
+
+    <section class="card">
       <h2>MAP <span class="r"><button class="chip" id="clearTrail">RESET CALIBRATION</button></span></h2>
-      <div class="mapwrap"><canvas id="map" width="720" height="720"></canvas><div class="maphint">click to drive there</div></div>
+      <div class="mapwrap"><canvas id="map" width="720" height="720"></canvas><div class="maphint" id="mapHint">click to drive there</div></div>
     </section>
 
     <section class="card">
@@ -178,7 +208,7 @@ const post = (url, body={}) => fetch(url, {method:"POST", headers:{"Content-Type
 /* ---------- camera view tabs ---------- */
 document.querySelectorAll("#views button").forEach(b => b.onclick = () => {
   document.querySelectorAll("#views button").forEach(x => x.classList.toggle("on", x === b));
-  $("cam").src = "/stream.mjpg?view=" + b.dataset.v + "&t=" + Date.now();
+  curView = b.dataset.v; $("cam").src = "/stream.mjpg?view=" + b.dataset.v + "&t=" + Date.now();
 });
 
 /* ---------- jobs ---------- */
@@ -187,33 +217,70 @@ $("mission").onclick = () => post("/api/mission", {repeats: +$("reps").value || 
 $("swap").onclick = () => post("/api/scene/swap");
 $("clearTrail").onclick = () => post("/api/reset_model");
 const JOBS = {calibrate:["/api/calibrate"], goA:["/api/goto_square",{name:"A"}], goB:["/api/goto_square",{name:"B"}],
-  dig:["/api/action",{name:"dig"}], dump:["/api/action",{name:"dump"}], scene:["/api/scene/detect"]};
+  dig:["/api/action",{name:"dig"}], dump:["/api/action",{name:"dump"}]};
+
+/* ---------- click modes, work area, command ---------- */
+let clickMode = "goto", curView = "camera";
+const HINT = {goto:"click: drive there", A:"click: place target A", B:"click: place target B", corners:"click the 4 corners"};
+function setClickMode(m){ clickMode = m;
+  document.querySelectorAll(".clickmode").forEach(b => b.classList.toggle("on", b.dataset.c === m));
+  $("clickHint").textContent = HINT[m]; $("mapHint").textContent = m === "corners" ? "corners: use the camera view" : HINT[m]; }
+document.querySelectorAll(".clickmode").forEach(b => b.onclick = () => setClickMode(b.dataset.c));
+$("clickModeBig").onclick = () => setClickMode("goto");
+setClickMode("goto");
+$("cam").addEventListener("click", e => {
+  const img = $("cam"), r = img.getBoundingClientRect();
+  const nw = img.naturalWidth || 16, nh = img.naturalHeight || 9;
+  const k = Math.min(r.width / nw, r.height / nh), dw = nw * k, dh = nh * k;
+  const u = (e.clientX - r.left - (r.width - dw) / 2) / dw, v = (e.clientY - r.top - (r.height - dh) / 2) / dh;
+  if (u < 0 || v < 0 || u > 1 || v > 1) return;
+  post("/api/click", {mode: clickMode, view: curView, u, v}).then(res => {
+    if (clickMode === "corners" && res.corners === 4) setClickMode("goto");
+    if (clickMode === "A" || clickMode === "B") setClickMode("goto"); });
+});
+document.querySelectorAll("#arenaMode button").forEach(b => b.onclick = () => {
+  const m = b.dataset.m, body = {mode: m, arena_w_cm: +$("aw").value, arena_h_cm: +$("ah").value};
+  if (m === "pink") body.square_cm = +$("aw").value;
+  if (m === "corners") { body.restart = true; setClickMode("corners"); }
+  post("/api/arena", body);
+});
+$("redetect").onclick = () => post("/api/arena", {arena_w_cm: +$("aw").value, arena_h_cm: +$("ah").value, square_cm: +$("aw").value});
+$("clearT").onclick = () => post("/api/targets/clear");
+function sendCmd(){ const t = $("cmd").value.trim(); if (!t) return; post("/api/command", {text: t}); $("cmd").value = ""; }
+$("send").onclick = sendCmd;
+$("cmd").addEventListener("keydown", e => { if (e.key === "Enter") sendCmd(); e.stopPropagation(); });
+$("cmd").addEventListener("keyup", e => e.stopPropagation());
 document.querySelectorAll("[data-job]").forEach(b => b.onclick = () => post(...JOBS[b.dataset.job]));
 
 /* ---------- map ---------- */
 const cv = $("map"), cx = cv.getContext("2d");
 let mapScale = 1, mapPad = 30;
 cv.addEventListener("click", e => {
-  if (!ST || !ST.scene.ok) return;
+  if (!ST || !ST.scene.ok || clickMode === "corners") return;
   const r = cv.getBoundingClientRect();
   const px = (e.clientX - r.left) * cv.width / r.width, py = (e.clientY - r.top) * cv.height / r.height;
-  const x = (px - mapPad) / mapScale, y = (py - mapPad) / mapScale, S = ST.scene.square_cm;
-  if (x < 0 || y < 0 || x > S || y > S) return;
-  post("/api/goto", {x, y});
+  const x = (px - mapPad) / mapScale, y = (py - mapPad) / mapScale;
+  if (x < 0 || y < 0 || x > ST.scene.w_cm || y > ST.scene.h_cm) return;
+  post("/api/click", {mode: clickMode, view: "map", u: x, v: y}).then(() => { if (clickMode !== "goto") setClickMode("goto"); });
 });
 function drawMap(){
-  const W = cv.width; cx.clearRect(0,0,W,W);
-  if (!ST || !ST.scene.ok) { cx.fillStyle="#7f8691"; cx.font="20px ui-monospace"; cx.textAlign="center";
-    cx.fillText(ST ? ST.scene.msg : "connecting…", W/2, W/2); return; }
-  const S = ST.scene.square_cm; mapScale = (W - 2*mapPad) / S;
+  const W = cv.width;
+  if (!ST || !ST.scene.ok) { cx.clearRect(0,0,W,cv.height); cx.fillStyle="#7f8691"; cx.font="20px ui-monospace"; cx.textAlign="center";
+    cx.fillText(ST ? ST.scene.msg : "connecting…", W/2, cv.height/2); return; }
+  const SW = ST.scene.w_cm, SH = ST.scene.h_cm;
+  const Hc = Math.round(W * SH / SW + 2*mapPad*(1 - SH/SW));
+  if (cv.height !== Hc) cv.height = Hc;
+  cx.clearRect(0,0,W,cv.height);
+  mapScale = (W - 2*mapPad) / SW;
   const T = (x,y) => [mapPad + x*mapScale, mapPad + y*mapScale];
-  // grid every 10 cm
   cx.strokeStyle="#1b1f26"; cx.lineWidth=1;
-  for (let g=10; g<S; g+=10){ let [a,b]=T(g,0),[c,d]=T(g,S); cx.beginPath();cx.moveTo(a,b);cx.lineTo(c,d);cx.stroke();
-    [a,b]=T(0,g);[c,d]=T(S,g); cx.beginPath();cx.moveTo(a,b);cx.lineTo(c,d);cx.stroke(); }
-  cx.strokeStyle="#ff4fb8"; cx.lineWidth=5; cx.strokeRect(mapPad, mapPad, S*mapScale, S*mapScale);
+  for (let g=10; g<SW; g+=10){ let [a,b]=T(g,0),[c,d]=T(g,SH); cx.beginPath();cx.moveTo(a,b);cx.lineTo(c,d);cx.stroke(); }
+  for (let g=10; g<SH; g+=10){ let [a,b]=T(0,g),[c,d]=T(SW,g); cx.beginPath();cx.moveTo(a,b);cx.lineTo(c,d);cx.stroke(); }
+  if (ST.scene.roi_map) { cx.beginPath(); ST.scene.roi_map.forEach((p,i)=>{const [a,b]=T(p[0],p[1]); i?cx.lineTo(a,b):cx.moveTo(a,b);});
+    cx.closePath(); cx.fillStyle="#3cd7ff10"; cx.fill(); cx.strokeStyle="#3cd7ff"; cx.lineWidth=3; cx.stroke(); }
   cx.fillStyle="#7f8691"; cx.font="13px ui-monospace"; cx.textAlign="left";
-  cx.fillText(`${S} cm`, mapPad, mapPad-10); cx.textAlign="center"; cx.fillText("▼ camera side", W/2, W-8);
+  cx.fillText(ST.scene.metric ? `${SW.toFixed(0)} × ${SH.toFixed(0)} cm` : "camera view · units ≈ cm near the robot", mapPad, mapPad-10);
+  cx.textAlign="center"; cx.fillText("▼ camera side", W/2, cv.height-8);
   for (const [name,t] of Object.entries(ST.scene.targets)) {
     cx.beginPath(); t.poly.forEach((p,i)=>{const [a,b]=T(p[0],p[1]); i?cx.lineTo(a,b):cx.moveTo(a,b);}); cx.closePath();
     cx.fillStyle="#3ddc8422"; cx.fill(); cx.strokeStyle="#3ddc84"; cx.lineWidth=3; cx.stroke();
@@ -224,6 +291,7 @@ function drawMap(){
   if (ST.target) { const [a,b]=T(...ST.target); cx.strokeStyle="#3cd7ff"; cx.lineWidth=3;
     cx.beginPath(); cx.moveTo(a-12,b); cx.lineTo(a+12,b); cx.moveTo(a,b-12); cx.lineTo(a,b+12); cx.stroke();
     cx.beginPath(); cx.arc(a,b,ST.cfg.goal_tol_cm*mapScale,0,7); cx.stroke(); }
+  cx.textAlign="center";
   if (ST.robot && !ST.pose) { const [a,b]=T(...ST.robot.center); cx.fillStyle="#f6b90b88"; cx.beginPath(); cx.arc(a,b,10,0,7); cx.fill(); }
   if (ST.pose) {
     const [x,y,h]=ST.pose, [a,b]=T(x,y), r = h*Math.PI/180;
@@ -260,7 +328,7 @@ setInterval(() => {
 }, 100);
 
 /* ---------- settings ---------- */
-const NUMS = [["square_cm","Pink square size (cm)"],["drive_speed","Auto drive throttle"],["turn_speed","Auto turn throttle"],
+const NUMS = [["robot_len_cm","Robot length (cm)"],["arena_tol","Work area colour tolerance"],["drive_speed","Auto drive throttle"],["turn_speed","Auto turn throttle"],
   ["goal_tol_cm","Arrive tolerance (cm)"],["bucket_offset_cm","Bucket ahead of centre (cm)"],["settle_s","Settle after move (s)"],
   ["calib_drive_s","Calib drive pulse (s)"],["calib_turn_s","Calib turn pulse (s)"]];
 function buildSettings(cfg){
@@ -294,10 +362,12 @@ async function poll(){
   try {
     ST = await (await fetch("/api/state")).json();
     if (!cfgLoaded) { buildSettings(ST.cfg); cfgLoaded = true;
+      $("aw").value = ST.cfg.arena_mode === "pink" ? ST.cfg.square_cm : ST.cfg.arena_w_cm; $("ah").value = ST.cfg.arena_h_cm;
       $("speed").value = ST.manual.speed; $("speedV").textContent = ST.manual.speed; }
     pill("pMode", ST.mode==="live" ? "ok" : "warn", ST.mode.toUpperCase());
     pill("pCam", ST.camera ? "ok" : "", ST.camera ? `CAMERA ${ST.fps} FPS` : "NO CAMERA");
-    pill("pScene", ST.scene.ok ? (Object.keys(ST.scene.targets).length===2 ? "ok" : "warn") : "", ST.scene.ok ? `SCENE ${Object.keys(ST.scene.targets).join("+") || "–"}` : "NO SCENE");
+    const tk = Object.keys(ST.scene.targets).sort();
+    pill("pScene", ST.scene.ok ? (tk.includes("A") && tk.includes("B") ? "ok" : "warn") : "", ST.scene.ok ? `AREA · TARGETS ${tk.join("+") || "NONE"}` : "NO WORK AREA");
     pill("pRobot", ST.robot ? "ok" : "", ST.robot ? "ROBOT SEEN" : "ROBOT LOST");
     pill("pCal", ST.model ? "ok" : "warn", ST.model ? "CALIBRATED" : "NOT CALIBRATED");
     $("camBadge").textContent = ST.scene.ok ? ST.scene.msg : ST.scene.msg;
@@ -310,6 +380,16 @@ async function poll(){
     $("tFwd").textContent = ST.model ? ST.model.fwd_cm_s + " cm/s" : "—";
     $("tTurn").textContent = ST.model ? ST.model.turn_deg_s + " °/s" : "—";
     $("swap").classList.toggle("on", ST.swap);
+    document.querySelectorAll("#arenaMode button").forEach(b => b.classList.toggle("on", b.dataset.m === ST.cfg.arena_mode));
+    $("sizeRow").style.display = ST.cfg.arena_mode === "auto" ? "none" : "";
+    $("arenaHelp").textContent = ST.pending_corners ? `corner ${ST.pending_corners}/4 clicked…` :
+      ({auto:"Uses the uniform surface under the robot (e.g. a blanket). Scale comes from the robot's size.",
+        corners:"Click 4 corners of a rectangle of known size on the camera image, then enter its size. Gives true cm.",
+        pink:"Pink tape square of the given size."})[ST.cfg.arena_mode];
+    if (clickMode === "corners") $("clickHint").textContent = `click corner ${ST.pending_corners + 1}/4`;
+    $("vlmState").textContent = ST.vlm_ready ? "VISION-LANGUAGE PLANNER READY" : "SET ANTHROPIC_API_KEY TO ENABLE";
+    $("send").disabled = !ST.vlm_ready || ST.busy;
+    if (ST.plan) $("plan").innerHTML = `<b>${ST.plan.say.replace(/</g,"&lt;")}</b>\n` + ST.plan.steps.map(s => "· " + JSON.stringify(s)).join("\n");
     const logTxt = ST.logs.join("\n");
     if (logTxt !== lastLog) { lastLog = logTxt; const L = $("log");
       L.innerHTML = ST.logs.map(l => { const c = /stopped|error|STOP|lost|gave up/i.test(l) ? "err" : /done|Arrived|complete|OK/.test(l) ? "ok" : /Mission|Calibration:/.test(l) ? "hl" : "";

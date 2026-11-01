@@ -9,7 +9,7 @@ python3 dashboard/server.py --sim      # try it with the simulator
 python3 dashboard/server.py --cam 1    # real excavator + iPhone camera
 ```
 
-iPhone on the table at an angle, pink tape square + two green squares on the floor, no markers. The excavator calibrates itself by wiggling, then goes A → dig → B → dump. Guide: [docs/05-autonomy-guide.md](docs/05-autonomy-guide.md).
+iPhone on the table at an angle, robot on any plain surface (e.g. a blanket), no markers or tape. Click to place targets or to drive, or type commands in plain language (vision-language planner). The excavator calibrates itself by wiggling, then goes A → dig → B → dump. Guide: [docs/05-autonomy-guide.md](docs/05-autonomy-guide.md).
 
 ![Dashboard](docs/img/dashboard.png)
 
@@ -54,4 +54,6 @@ captures/  raw logs + session notes (what was pressed when)
 - [x] Markerless perception: pink square homography, green targets, yellow blob
 - [x] Self-calibration by active perception, move-stop-look go-to, A→B mission (11/11 in sim)
 - [x] Autonomy dashboard (camera views, map click-to-drive, mission, tuning)
+- [x] Surface-agnostic work area (auto region / clicked corners / tape), click-placed targets
+- [x] Plain-language commands via vision-language planner
 - [ ] Run on the real floor

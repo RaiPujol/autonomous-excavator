@@ -48,7 +48,9 @@ class Hub:
         self.uuid, self.ctr, self.frames = "", 0, 0
         # perception
         self.frame, self.frame_t, self.fps = None, 0.0, 0.0
-        self.scene = vision.Scene(square_cm=cfg["square_cm"])
+        self.scene = vision.Scene()
+        self.pending_corners = []
+        self.last_plan = None
         self.swap = False
         self.obs = None
         self.obs_buf = collections.deque(maxlen=30)
@@ -128,6 +130,66 @@ class Hub:
         self.job.start()
         return True
 
+    def apply_manual_targets(self, sc):
+        for name, c in (self.cfg.get("manual_targets") or {}).items():
+            sc.targets[name] = vision.square_target(c, 10.0)
+
+    def set_target(self, name, x, y):
+        mt = dict(self.cfg.get("manual_targets") or {})
+        mt[name] = [round(x, 2), round(y, 2)]
+        self.cfg["manual_targets"] = mt
+        self.scene.targets[name] = vision.square_target((x, y), 10.0)
+        self.log(f"Target {name} set at ({x:.1f}, {y:.1f})")
+
+    def click_to_map(self, view, u, v):
+        with self.lock:
+            frame = self.frame
+        sc = self.scene
+        if frame is None or not sc.ok:
+            return None
+        if view == "map":
+            return u, v
+        if view == "topdown" and sc.metric:
+            return u * sc.w_cm, v * sc.h_cm
+        fh, fw = frame.shape[:2]
+        x, y = vision.to_map(sc.H, [(u * fw, v * fh)])[0]
+        return float(x), float(y)
+
+    def run_plan(self, text):
+        import autonomy.vlm as vlm
+        with self.lock:
+            frame, obs = self.frame, self.obs
+        self.log(f'Command: "{text}"')
+        self.brain.status = "thinking"
+        p = vlm.plan(frame, self.scene, obs, self.brain.pose, self.scene.targets, text, self.cfg)
+        self.last_plan = p
+        self.log(f"Plan: {p['say']}")
+        for st in p["steps"]:
+            self.log("  - " + json.dumps(st))
+        b = self.brain
+        for st in p["steps"]:
+            self._check()
+            d = st["do"]
+            if d == "goto":
+                b.go_to((st["x"], st["y"]))
+            elif d == "goto_target":
+                t = self.scene.targets.get(st["name"])
+                if t is None:
+                    raise Abort(f"no target {st['name']}")
+                b.go_to(t["center"])
+            elif d == "set_target":
+                self.set_target(st["name"], st["x"], st["y"])
+            elif d in ("dig", "dump"):
+                b.sequence(d)
+            elif d == "lights":
+                self.lights = bool(st.get("on", True))
+            elif d == "wait":
+                end = time.time() + min(10.0, float(st.get("seconds", 1)))
+                while time.time() < end:
+                    self._check()
+                    time.sleep(0.05)
+        self.log("Command done")
+
     def busy(self):
         return bool(self.job and self.job.is_alive())
 
@@ -171,10 +233,16 @@ def vision_loop(hub, cam):
         if hub.redetect or (not hub.scene.ok and t - last_try > 2):
             last_try = t
             sc = vision.detect_scene(frame, hub.cfg, hub.swap)
+            if sc.ok:
+                hub.apply_manual_targets(sc)
             if sc.ok or hub.redetect:
                 hub.log(f"Scene: {sc.msg}")
             hub.scene = sc
             hub.redetect = False
+        elif hub.scene.ok and not hub.scene.metric and "put the robot" in hub.scene.msg \
+                and t - last_try > 2 and not hub.busy():
+            last_try = t
+            hub.redetect = True     # robot may be in view now: recompute the scale
         obs = vision.detect_robot(frame, hub.scene, hub.cfg, t)
         with hub.lock:
             hub.frame, hub.frame_t, hub.obs = frame, t, obs
@@ -266,6 +334,8 @@ class Handler(BaseHTTPRequestHandler):
                     "pose": None if b.pose is None else [round(v, 2) for v in b.pose],
                     "model": b.model, "target": b.target, "trail": b.trail[-200:],
                     "status": b.status, "busy": h.busy(), "logs": list(h.logs)[-60:],
+                    "pending_corners": len(h.pending_corners), "plan": h.last_plan,
+                    "vlm_ready": bool(os.environ.get("ANTHROPIC_API_KEY")),
                     "uuid": h.uuid, "out": h.out, "frames": h.frames,
                     "manual": {"speed": h.m_speed, "lights": h.lights, "trim": h.trim, "turn_mode": h.turn_mode},
                     "cfg": h.cfg,
@@ -320,6 +390,52 @@ class Handler(BaseHTTPRequestHandler):
             reps = max(1, min(20, int(msg.get("repeats", 1))))
             h.log(f"Mission start x{reps}")
             return self._json({"ok": h.start_job("Mission", lambda: b.mission(h.scene, reps))})
+        if p == "/api/click":
+            mode, view = msg.get("mode", "goto"), msg.get("view", "camera")
+            u, v = float(msg["u"]), float(msg["v"])
+            if mode == "corners":
+                h.pending_corners.append([round(u, 4), round(v, 4)])
+                n = len(h.pending_corners)
+                h.log(f"Corner {n}/4")
+                if n == 4:
+                    h.cfg["arena_corners"] = h.pending_corners
+                    h.cfg["arena_mode"] = "corners"
+                    h.pending_corners = []
+                    h.redetect = True
+                    b.model, b.pose = None, None
+                return self._json({"ok": True, "corners": n})
+            pt = h.click_to_map(view, u, v)
+            if pt is None:
+                return self._json({"ok": False, "error": "no work area yet"})
+            if mode in ("A", "B"):
+                h.set_target(mode, *pt)
+                return self._json({"ok": True})
+            h.log(f"Go to ({pt[0]:.1f}, {pt[1]:.1f})")
+            return self._json({"ok": h.start_job("Go-to", lambda: b.go_to(pt))})
+        if p == "/api/arena":
+            mode = msg.get("mode")
+            if mode in ("auto", "corners", "pink"):
+                h.cfg["arena_mode"] = mode
+            for k in ("arena_w_cm", "arena_h_cm", "square_cm"):
+                if k in msg:
+                    h.cfg[k] = float(msg[k])
+            if mode == "corners" and msg.get("restart"):
+                h.pending_corners = []
+                h.log("Click the 4 corners of the work area on the camera image")
+                return self._json({"ok": True})
+            h.redetect = True
+            b.model, b.pose, b.trail = None, None, []
+            return self._json({"ok": True})
+        if p == "/api/targets/clear":
+            h.cfg["manual_targets"] = {}
+            h.redetect = True
+            h.log("Targets cleared")
+            return self._json({"ok": True})
+        if p == "/api/command":
+            text = str(msg.get("text", "")).strip()[:300]
+            if not text:
+                return self._json({"ok": False})
+            return self._json({"ok": h.start_job("Command", lambda: h.run_plan(text))})
         if p == "/api/reset_model":
             b.model, b.pose, b.trail = None, None, []
             h.log("Calibration cleared")
@@ -329,7 +445,7 @@ class Handler(BaseHTTPRequestHandler):
             for k, v in upd.items():
                 if k in h.cfg:
                     h.cfg[k] = v
-            if any(k in upd for k in ("hsv", "square_cm")):
+            if any(k in upd for k in ("hsv", "square_cm", "arena_w_cm", "arena_h_cm", "arena_tol", "robot_len_cm")):
                 h.redetect = True
             if msg.get("save"):
                 cfgmod.save(h.cfg)
