@@ -20,7 +20,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from excavator.protocol import bits_from_names, frame_uuid  # noqa: E402
+from excavator.protocol import bits_from_names, frame_uuid, pulse_turn  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEADMAN_S = 0.4
@@ -34,6 +34,7 @@ class State:
         self.d = 0
         self.lights = False
         self.trim = 0
+        self.turn_mode = "throttle"  # or "pulse"
         self.last_update = 0.0
         self.ctr = 0
         self.uuid = frame_uuid(0, 0, False, 0)
@@ -42,7 +43,7 @@ class State:
 
     def snapshot(self):
         return {"uuid": self.uuid, "ctr": self.ctr, "frames": self.frames,
-                "d": self.d, "speed": self.speed, "lights": self.lights, "trim": self.trim,
+                "d": self.d, "speed": self.speed, "lights": self.lights, "trim": self.trim, "turn_mode": self.turn_mode,
                 "mode": self.mode}
 
 
@@ -89,6 +90,8 @@ class Handler(BaseHTTPRequestHandler):
             S.d = bits_from_names(msg.get("actions", []))
             S.lights = bool(msg.get("lights", S.lights))
             S.trim = max(-30, min(30, int(msg.get("trim", S.trim))))
+            if msg.get("turn_mode") in ("throttle", "pulse"):
+                S.turn_mode = msg["turn_mode"]
             S.last_update = time.time()
             self._json(S.snapshot())
 
@@ -131,7 +134,11 @@ def main():
             with S.lock:
                 if S.d and time.time() - S.last_update > DEADMAN_S:
                     S.d = 0  # deadman: page went quiet
-                S.uuid = frame_uuid(S.ctr, S.speed, S.lights, S.d, S.trim)
+                d = S.d
+                if S.turn_mode == "pulse":
+                    d = pulse_turn(d, S.speed, S.frames)
+                S.uuid = frame_uuid(S.ctr, S.speed, S.lights, d, S.trim,
+                                    turn_bytes=S.turn_mode == "throttle")
                 S.ctr = (S.ctr + 1) & 0xFF
                 S.frames += 1
                 uuid = S.uuid

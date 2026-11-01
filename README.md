@@ -8,9 +8,7 @@ Turning a Trasped 1:64 RC excavator (HG4-301/413 family, "2.4G remote + app" dua
 python3 ui/server.py
 ```
 
-Open http://localhost:8000 (or the phone URL it prints, same Wi-Fi). Close the RCCar app first.
-Keys: **WASD** drive, **arrows** boom/turret, **1-5** throttle, **L** lights, **Space** stop. Gamepads work too.
-If the page goes quiet for 0.4 s the excavator stops.
+Open http://localhost:8000. Full step-by-step guide: [docs/03-control-panel-guide.md](docs/03-control-panel-guide.md).
 
 ![Control panel](docs/img/ui-desktop.png)
 
@@ -18,8 +16,7 @@ If the page goes quiet for 0.4 s the excavator stops.
 
 1. **Reverse engineer the app protocol** and control the excavator from an ESP32. Plan: [docs/01-reverse-engineering-plan.md](docs/01-reverse-engineering-plan.md)
 2. **Control API** on the ESP32 (serial / Wi-Fi): `drive`, `swing`, `boom`, `arm`, `bucket`, `lights`.
-3. **Perception**: camera feed (phone or ESP32-CAM) to a GPU machine over Tailscale.
-4. **Autonomy stack**: localization, task planning (dig, dump), closed-loop control.
+3. **Autonomy stack**: iPhone overhead camera + ArUco markers, pose, go-to-point, dig/dump. Plan: [docs/04-autonomy-plan.md](docs/04-autonomy-plan.md)
 
 ## Repo layout
 
@@ -40,5 +37,6 @@ captures/  raw logs + session notes (what was pressed when)
 - [x] **Mac drives the excavator** (`tools/mac_rccar_tx.py`, worked first try, 2026-10-31)
 - [ ] Confirm bucket down = 0x20
 - [x] Python control API + web control panel (keyboard, touch, gamepad)
-- [ ] Overhead camera + ArUco pose
+- [x] Throttle floor 15, throttle applies to turns, trim
+- [ ] Overhead iPhone camera + ArUco pose (`tools/camera_check.py`, `docs/markers.pdf`)
 - [ ] Go-to-point, then scripted dig/dump
