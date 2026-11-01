@@ -72,6 +72,8 @@ class Hub:
 
     def pulse(self, actions, speed, secs):
         self._check()
+        # terminal only: exact motor command history, to line up with when the toy dies
+        print(time.strftime("%H:%M:%S ") + f"pulse {'+'.join(actions)} speed {speed} {secs:.2f}s", flush=True)
         with self.lock:
             self.auto = (bits_from_names(actions), speed, time.time() + secs)
         end = time.time() + secs
@@ -507,10 +509,17 @@ def main():
     if ip:
         print(f"From another device on the same Wi-Fi: http://{ip}:{a.port}")
     frame_s = 0.05 if a.sim or a.dry_run else 0.1
+    last_tx, last_warn = time.time(), 0.0
     try:
         while True:
             tx.send(HUB.tick())
             tx.pump(frame_s)   # BLE run loop lives on the main thread
+            now = time.time()
+            gap = now - last_tx
+            last_tx = now
+            if gap > 2.5 * frame_s and now - last_warn > 1.0:
+                last_warn = now
+                HUB.log(f"RADIO GAP {gap * 1000:.0f} ms (frames should go out every {frame_s * 1000:.0f} ms)")
     except KeyboardInterrupt:
         pass
     finally:

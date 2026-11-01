@@ -372,6 +372,10 @@ async function poll(){
     pill("pRobot", ST.robot ? "ok" : "", ST.robot ? "ROBOT SEEN" : "ROBOT LOST");
     pill("pCal", ST.model ? "ok" : "warn", ST.model ? "CALIBRATED" : "NOT CALIBRATED");
     $("camBadge").textContent = ST.scene.ok ? ST.scene.msg : ST.scene.msg;
+    { const td = document.querySelector('#views [data-v="topdown"]'), flat = ST.scene.ok && ST.scene.metric;
+      td.disabled = !flat;
+      td.title = flat ? "" : "TOP-DOWN needs a known rectangle: WORK AREA → CLICK CORNERS (or PINK TAPE). In AUTO mode the map is the camera view.";
+      if (!flat && td.classList.contains("on")) document.querySelector('#views [data-v="camera"]').click(); }
     $("status").classList.toggle("busy", ST.busy); $("statusTxt").textContent = ST.status;
     $("statusSub").textContent = ST.busy ? "SPACE / STOP aborts" : "";
     document.querySelectorAll("[data-job], #mission").forEach(b => b.disabled = ST.busy);
