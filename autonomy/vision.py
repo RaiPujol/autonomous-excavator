@@ -231,6 +231,8 @@ class RobotObs:
     elong: float           # sqrt(l1/l2); <1.3 means axis is unreliable
     area_cm2: float
     contour_img: np.ndarray = None
+    front_deg: float = 0.0     # full heading of the arm side, 0-360 (from blob asymmetry)
+    skew: float = 0.0          # how lopsided the blob is; ~0 = front/back unknown, >0.3 = clear
 
 
 def detect_robot(frame, scene, cfg, t=0.0):
@@ -268,13 +270,41 @@ def detect_robot(frame, scene, cfg, t=0.0):
     major = v[:, 1]
     axis = math.degrees(math.atan2(major[1], major[0])) % 180
     elong = math.sqrt(max(w[1], 1e-6) / max(w[0], 1e-6))
+    # Front vs back: the arm sticks out one end only, so yellow pixels trail off
+    # towards the front (positive skew along the long axis). Third moment, normalised.
+    proj = (P - mu) @ major
+    sd = float(proj.std()) or 1.0
+    sk = float(np.mean((proj / sd) ** 3))
+    front = math.degrees(math.atan2(major[1], major[0])) % 360
+    if sk < 0:
+        front = (front + 180) % 360
     poly = to_map(scene.H, c)
     return RobotObs(t=t, center=(float(mu[0]), float(mu[1])), axis_deg=axis, elong=elong,
-                    area_cm2=float(cv2.contourArea(poly.astype(np.float32))), contour_img=c)
+                    area_cm2=float(cv2.contourArea(poly.astype(np.float32))), contour_img=c,
+                    front_deg=front, skew=abs(sk))
 
 
 # ---------- drawing helpers ----------
 PINK, GREEN, YEL, WHITE, CYAN = (180, 80, 255), (90, 220, 90), (11, 185, 246), (255, 255, 255), (255, 220, 60)
+
+
+def average_obs(got):
+    """Average several RobotObs from consecutive frames (axis averaged mod 180,
+    front direction averaged as a vector)."""
+    if len(got) < 2:
+        return None
+    cx = sum(o.center[0] for o in got) / len(got)
+    cy = sum(o.center[1] for o in got) / len(got)
+    s = sum(math.sin(math.radians(2 * o.axis_deg)) for o in got)
+    c = sum(math.cos(math.radians(2 * o.axis_deg)) for o in got)
+    axis = (math.degrees(math.atan2(s, c)) / 2) % 180
+    fx = sum(o.skew * math.cos(math.radians(o.front_deg)) for o in got)
+    fy = sum(o.skew * math.sin(math.radians(o.front_deg)) for o in got)
+    return RobotObs(t=got[-1].t, center=(cx, cy), axis_deg=axis,
+                    elong=sum(o.elong for o in got) / len(got),
+                    area_cm2=got[-1].area_cm2, contour_img=got[-1].contour_img,
+                    front_deg=math.degrees(math.atan2(fy, fx)) % 360,
+                    skew=math.hypot(fx, fy) / len(got))
 
 
 def map_to_img(scene, pts):

@@ -291,7 +291,8 @@ setInterval(() => {
 /* ---------- settings ---------- */
 const NUMS = [["robot_len_cm","Robot length (cm)"],["arena_tol","Work area colour tolerance"],["drive_speed","Auto drive throttle"],["turn_speed","Auto turn throttle"],
   ["goal_tol_cm","Arrive tolerance (cm)"],["bucket_offset_cm","Bucket ahead of centre (cm)"],["settle_s","Settle after move (s)"],
-  ["calib_drive_s","Calib drive pulse (s)"],["calib_turn_s","Calib turn pulse (s)"],
+  ["calib_drive_s","Calib drive pulse (s)"],["calib_turn_s2","Calib spin pulse (s)"],
+  ["arc_speed","Steer: track speed"],["spin_tol_deg","Steer: spin above (°)"],["near_cm","Steer: near target (cm)"],
   ["min_drive_pulse_s","Min drive pulse (s)"],["min_turn_pulse_s","Min turn pulse (s)"]];
 function buildSettings(cfg){
   const box = $("hsv"); box.innerHTML = "";

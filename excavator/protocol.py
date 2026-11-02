@@ -64,6 +64,16 @@ def frame_uuid(ctr, speed, lights, d, trim=0, turn_bytes=True):
     return f"{chk:02x}{ctr & 0xFF:02x}0014-{a:02x}{b:02x}-{c:02x}{d:02x}-{ID}"
 
 
+def frame_uuid_tracks(ctr, a, b, lights, d):
+    """Frame with explicit track speeds A, B (each clamped to 0-50). Used by the
+    autopilot to steer while driving: uneven tracks curve the excavator."""
+    a = max(0, min(MAX_SPEED, int(round(a))))
+    b = max(0, min(MAX_SPEED, int(round(b))))
+    c = LIGHTS if lights else 0
+    chk = ctr ^ a ^ b ^ c ^ d ^ 0x08
+    return f"{chk:02x}{ctr & 0xFF:02x}0014-{a:02x}{b:02x}-{c:02x}{d:02x}-{ID}"
+
+
 def pulse_turn(d, speed, frame, period=5):
     """Software PWM for spin turns: keep the turn bit on for speed/50 of each
     period, so a toy that ignores A/B on turns still turns slower."""

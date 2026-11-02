@@ -26,7 +26,7 @@ from autonomy import config as cfgmod  # noqa: E402
 from autonomy import vision  # noqa: E402
 from autonomy.brain import Abort, Brain  # noqa: E402
 from autonomy.vision import RobotObs  # noqa: E402
-from excavator.protocol import bits_from_names, frame_uuid, pulse_turn, track_speeds  # noqa: E402
+from excavator.protocol import bits_from_names, frame_uuid, frame_uuid_tracks, pulse_turn, track_speeds  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEADMAN_S = 0.4
@@ -41,7 +41,7 @@ class Hub:
         self.m_actions, self.m_speed, self.lights, self.trim = [], 25, False, 0
         self.turn_mode, self.m_last = "throttle", 0.0
         # autonomous command
-        self.auto = None            # (bits, speed, until)
+        self.auto = None            # (bits, speed, until, (a, b) or None)
         self.abort = threading.Event()
         # radio output
         self.out = (0, 0, 0)        # d, a, b actually on air
@@ -70,12 +70,13 @@ class Hub:
         if self.abort.is_set():
             raise Abort("stopped by user")
 
-    def pulse(self, actions, speed, secs):
+    def pulse(self, actions, speed, secs, tracks=None):
         self._check()
         # terminal only: exact motor command history, to line up with when the toy dies
-        print(time.strftime("%H:%M:%S ") + f"pulse {'+'.join(actions)} speed {speed} {secs:.2f}s", flush=True)
+        spd = f"tracks {tracks[0]}/{tracks[1]}" if tracks else f"speed {speed}"
+        print(time.strftime("%H:%M:%S ") + f"pulse {'+'.join(actions)} {spd} {secs:.2f}s", flush=True)
         with self.lock:
-            self.auto = (bits_from_names(actions), speed, time.time() + secs)
+            self.auto = (bits_from_names(actions), speed, time.time() + secs, tracks)
         end = time.time() + secs
         while time.time() < end:
             self._check()
@@ -86,6 +87,10 @@ class Hub:
         while time.time() < end:
             self._check()
             time.sleep(0.01)
+
+    def drive(self, a, b, secs, back=False):
+        """Drive with explicit track speeds (the autopilot steers this way)."""
+        self.pulse(["back" if back else "forward"], max(a, b), secs, tracks=(int(a), int(b)))
 
     def observe(self, n=3, timeout=1.5):
         t0 = time.time()
@@ -98,16 +103,7 @@ class Hub:
                 got.extend(fresh[: n - len(got)])
                 last_t = got[-1].t
             time.sleep(0.02)
-        if len(got) < 2:
-            return None
-        cx = sum(o.center[0] for o in got) / len(got)
-        cy = sum(o.center[1] for o in got) / len(got)
-        s = sum(math.sin(math.radians(2 * o.axis_deg)) for o in got)
-        c = sum(math.cos(math.radians(2 * o.axis_deg)) for o in got)
-        axis = (math.degrees(math.atan2(s, c)) / 2) % 180
-        return RobotObs(t=got[-1].t, center=(cx, cy), axis_deg=axis,
-                        elong=sum(o.elong for o in got) / len(got),
-                        area_cm2=got[-1].area_cm2, contour_img=got[-1].contour_img)
+        return vision.average_obs(got)
 
     # ---------- jobs ----------
     def start_job(self, name, fn):
@@ -206,16 +202,20 @@ class Hub:
     def tick(self):
         with self.lock:
             now = time.time()
+            tracks = None
             if self.auto and now < self.auto[2]:
-                d, speed = self.auto[0], self.auto[1]
+                d, speed, tracks = self.auto[0], self.auto[1], self.auto[3]
             elif not self.busy() and now - self.m_last < DEADMAN_S:
                 d, speed = bits_from_names(self.m_actions), self.m_speed
             else:
                 d, speed = 0, self.m_speed
             if self.turn_mode == "pulse":
                 d = pulse_turn(d, speed, self.frames)
-            self.uuid = frame_uuid(self.ctr, speed, self.lights, d, self.trim,
-                                   turn_bytes=self.turn_mode == "throttle")
+            if tracks:
+                self.uuid = frame_uuid_tracks(self.ctr, tracks[0], tracks[1], self.lights, d)
+            else:
+                self.uuid = frame_uuid(self.ctr, speed, self.lights, d, self.trim,
+                                       turn_bytes=self.turn_mode == "throttle")
             a, b = (int(self.uuid[9:11], 16), int(self.uuid[11:13], 16))
             self.out = (d, a, b)
             self.ctr = (self.ctr + 1) & 0xFF

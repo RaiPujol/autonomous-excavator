@@ -9,12 +9,13 @@ The excavator finds itself with the iPhone camera, learns how it moves, and driv
    - **CLICK CORNERS**: click 4 corners of any rectangle of known size on the camera image, enter its size. Gives true top-down cm.
    - **PINK TAPE**: the original pink tape square.
 2. **Targets.** Click SET A / SET B (bottom-left of the camera), then click on the camera image. (Green tape squares still work automatically.)
-3. **Robot.** The biggest yellow blob inside the work area.
-4. **Calibration by active perception.** Drives forward, back, spins left and right, watching itself: learns heading, speed, turn rate, which spin is which.
-5. **Move, stop, look.** Short pulses, fresh camera measurement, repeat until the bucket is at the target. Works in the camera view because straight lines on the floor stay straight in the image.
-6. **Mission / commands.** RUN MISSION = A, dig, B, dump. Or type a request in COMMAND (needs an API key, see below).
+3. **Robot.** The biggest yellow blob inside the work area. **Which end is the front** comes from the arm: it sticks out one end only, so the yellow blob is lopsided towards it. That gives a full 0-360° heading from a single look.
+4. **Heading filter.** Three clues fused by a small Kalman filter: where the robot actually went when it drove (strongest), the arm side (every frame, a bit noisy), and the blob's long axis (precise, but can't tell front from back). It also learns the turret offset, and stops trusting the arm side if it keeps disagreeing with the motion.
+5. **Calibration by active perception.** Forward + back (speed, true heading, which end the arm is on), 4 short spins (spin rate and motor dead time, kept under 90° each), then forward + back with uneven tracks (how much uneven tracks steer, and which track is A).
+6. **Steer while driving.** A and B are the two track speeds, so it drives in curves towards the target and corrects every look (like pure pursuit). It only spins in place if the target is more than 60° off, or very close. Spins aim 80% of the way and the spin rate is re-measured after every spin, because the toy spins fast whatever throttle is sent. If uneven tracks don't steer, it falls back to spin-then-drive automatically.
+7. **Mission / commands.** RUN MISSION = A, dig, B, dump. Or type a request in COMMAND (needs an API key, see below).
 
-Tested in the simulator: 17/17 missions from random start poses (metric and camera-view modes).
+Tested in a realistic simulator (fast fixed-speed spins, motor dead time, random track wiring, drift, dark engine deck): `python3 tests/sim_missions.py` → 90/90 goals on 30 random robots. The previous controller got 48/90 there, failing with the same "too many steps" seen on the real toy.
 
 ## Setup (once)
 
@@ -51,7 +52,7 @@ Open http://localhost:8000, press RUN MISSION. Everything works the same as for 
 
 ## Run it for real
 
-1. Close the RCCar app on the phone. Excavator on, on the blanket, turret centred.
+1. Close the RCCar app on the phone. Excavator on, on the blanket, turret centred, **arm low and stretched out forward** (travel pose: the arm is how it tells front from back).
 2. Start (replace `1` with your camera number):
    ```bash
    python3 dashboard/server.py --cam 1
@@ -86,7 +87,12 @@ Open http://localhost:8000, press RUN MISSION. Everything works the same as for 
 | A and B the wrong way round | SWAP A/B |
 | ROBOT LOST | Settings → YELLOW. Make sure the floor isn't picked up |
 | Calibration "only moved X cm" | Raise Auto drive throttle or Calib drive pulse |
-| Calibration "spin too small" / spins wildly | Turn speed is the unknown: adjust Calib turn pulse (shorter if it spins more than ~60° per pulse) |
+| Calibration "spin too small" | Raise Calib spin pulse |
+| "robot looks round from here" | Arm tucked in or raised: stretch it out low and forward. Without the arm, some viewing angles give no heading at all |
+| "arm direction unclear" / "ignoring it" | Fine, it still works from motion + long axis, just more probe drives. Check the turret is centred |
+| "uneven tracks barely steer" | It falls back to spin-then-drive. Raise "Steer: track speed" (more room between the two tracks) |
+| Arrow on the camera points the wrong way after calibration | Arm folded back? It detects that, but recalibrate in travel pose |
+| Orbits around a close target | Raise "Steer: near target" |
 | Stops short or overshoots | Arrive tolerance, Bucket ahead of centre |
 | Zig-zags a lot | Raise Settle after move (camera lag) |
 | Excavator switches off mid-run | Charge it first (200 mAh, ~20 min). If it still happens: "gentle mode" = Settings → Min drive pulse 0.3, Min turn pulse 0.25 (fewer motor starts, smaller current spikes). Also try TURN: PULSE in the Manual card |
@@ -99,7 +105,8 @@ Edits apply live. Press SAVE SETTINGS to keep them.
 autonomy/config.py   settings + defaults
 autonomy/vision.py   work area, homography, robot blob, overlays, grid for the planner
 autonomy/brain.py    calibration, go-to, dig/dump, mission
-autonomy/sim.py      simulated camera + excavator
+autonomy/sim.py      simulated camera + excavator (realistic: fast spins, dead time, random track wiring)
+tests/sim_missions.py  headless regression test: calibrate + go-to on many random robots
 autonomy/vlm.py      plain-language commands -> plan (Claude vision)
 dashboard/server.py  camera + brain + Bluetooth + web server
 dashboard/index.html the dashboard

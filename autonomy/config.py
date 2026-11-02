@@ -28,7 +28,20 @@ DEFAULTS = {
     "drive_speed": 22,            # throttle for autonomous driving (15-50)
     "turn_speed": 18,
     "calib_drive_s": 0.6,
-    "calib_turn_s": 0.45,
+    "calib_turn_s1": 0.15,        # calibration spins: two lengths each way -> spin rate + motor dead time
+    "calib_turn_s2": 0.30,        #   (kept short so even a fast toy turns < 90 deg per pulse)
+    "calib_track_diff": 12,       # calibration: forward with tracks A/B = arc_speed +/- 6 to learn steering
+    "arc_speed": 30,              # average track speed when steering while driving
+    "arc_gain": 1.5,              # deg/s of turn per deg of heading error
+    "arc_max_turn_deg_s": 60,
+    "spin_tol_deg": 60,           # spin in place only if the target is more than this off the nose
+    "spin_aim": 0.8,              # spin this fraction of the error (overshoot is worse than undershoot)
+    "max_spin_deg": 60,           # max turn per spin pulse (must stay < 90 to read it from the long axis)
+    "near_cm": 12,                # closer than this: spin then go straight (target inside the turning circle)
+    "probe_sd_deg": 25,           # heading this uncertain: drive a short probe to re-measure it
+    "skew_min": 0.08,             # blob lopsidedness needed to trust the arm side
+    "arm_offset_max_deg": 20,     # calibration: arm this far from the drive direction = arm reading unreliable
+    "max_steps": 60,
     "max_drive_pulse_s": 0.7,
     "max_turn_pulse_s": 0.35,
     "settle_s": 0.35,             # wait after each pulse before looking
