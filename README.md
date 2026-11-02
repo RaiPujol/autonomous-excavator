@@ -149,25 +149,5 @@ captures/    capture session notes
 docs/        write-ups, images, archive/ (superseded marker-based plan)
 ```
 
-## Known issues
 
-- **Excavator switches off during autonomous runs.** Most likely a weak battery (3.7 V 200 mAh, ~20 min): autonomous mode starts the motors many times, and each start draws a current spike that can reset the toy's chip. Next test: full charge, then "gentle mode" (Settings: Min drive pulse 0.3 s, Min turn pulse 0.25 s) to see if fewer, longer pulses avoid it.
-- **Turn speed on spins**: the toy seems to spin at its own speed whatever we send. The autopilot now copes (short capped spins, online rate estimate) and steers with the tracks instead where it can.
-- **Arm hidden = no heading**: with the arm tucked in, the blob looks round from some angles. Drive in the travel pose (arm low, stretched out).
-- **Bucket down = `0x20`** is inferred from the bit pattern, not captured.
-- **Height bias**: the robot is ~5 cm tall, so from an angled camera it appears slightly further away than it is. Large targets absorb it; a correction is planned if it stops short.
 
-## Roadmap
-
-- [x] Decode the app protocol and drive from the Mac
-- [x] Manual control panel (keyboard, touch, gamepad, trim)
-- [x] Markerless perception, self-calibration, go-to, A→B mission, simulator
-- [x] Surface-agnostic work area, click-placed targets, plain-language commands
-- [ ] Full mission on the real floor + demo video + metrics (cycle time, success rate over 10 runs)
-- [ ] ROS 2 nodes (camera, perception, planner, radio driver) with Foxglove visualisation
-- [ ] Safety layer on the ESP32 in firmware (deadman, rate limits, e-stop), Mac sends commands over serial
-- [x] Realistic simulator + headless regression test (`tests/sim_missions.py`)
-- [ ] Obstacles: occupancy grid from the fixed camera, A* with inflated obstacles, blanket edge as a boundary
-- [ ] Optional prior map from a phone 3D scan (iPhone 15 Pro LiDAR), aligned with the blanket corners
-- [ ] Simulator missions as regression tests in CI
-- [ ] Learned detector / keypoints trained on frames auto-labelled by the current pipeline
