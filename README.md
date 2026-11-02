@@ -12,7 +12,11 @@ The project has two halves. Each one stands on its own:
 
 ![Autonomy dashboard](docs/img/dashboard.png)
 
+<p align="center"><img src="docs/img/sim-mission-camera-4x.gif" width="640" alt="Simulated mission: calibrate, drive to A, dig, drive to B, dump"><br><em>Full mission in the simulator (4x speed): self-calibration, then A → dig → B → dump. Try it: <code>python3 dashboard/server.py --sim</code></em></p>
+
 ## The process
+
+![The process](docs/img/diagram-process-timeline.png)
 
 How it actually went, including what didn't work. Each step changed the next one.
 
@@ -23,6 +27,8 @@ How it actually went, including what didn't work. Each step changed the next one
 **2. Improvise the capture.** The textbook approach is Android's Bluetooth HCI snoop log, but I had no Android phone. Instead I ran the app on an iPhone and wrote a sniffer on the Mac ([`tools/ble_sniff.py`](tools/ble_sniff.py)) that logs every nearby Bluetooth advertisement. One device changed its payload 55 times while every other device stayed constant: the phone.
 
 **3. Find where the commands hide.** The app never connects to the toy. It *broadcasts* each command, and the toy's 2.4 GHz receiver picks the broadcast up. iOS doesn't let apps put custom data in a broadcast, so the app smuggles the command inside the 128-bit **service UUID** it advertises:
+
+![Radio frame](docs/img/diagram-protocol-frame.png)
 
 ```
 chk ctr 0014 - A  B - C  D - 3430-34b7067f070c
@@ -53,6 +59,8 @@ chk ctr 0014 - A  B - C  D - 3430-34b7067f070c
 **11. Fix the root causes.** The failure had two causes:
 - *Heading.* The blob's long axis can't tell front from back and can read sideways. Fix: the arm sticks out only at the front, so the blob is lopsided towards it (third moment of the pixel distribution). A Kalman filter fuses that with actual motion and the long axis, learns the turret offset, and stops trusting the arm if it disagrees with motion. When unsure, the robot drives a short probe to re-measure.
 - *Control.* Fast fixed-speed spins overshot a tight heading tolerance forever. Fix: steer while driving with uneven track speeds (pure-pursuit style), spin only for large errors, aim spins short, and re-identify the spin rate online after every spin.
+
+![Old vs new autopilot in the simulator](docs/img/sim-results-before-after.png)
 
 Result: 90/90 goals, plus 60/60 with the turret 25° off centre and 60/60 for a toy whose tracks can't steer (automatic fallback). [`tests/sim_missions.py`](tests/sim_missions.py) runs it headless in under two minutes.
 
